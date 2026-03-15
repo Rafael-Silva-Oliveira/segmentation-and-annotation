@@ -1,0 +1,34 @@
+# Visium HD CRC Tutorial Configuration
+# 10x Genomics Human Colorectal Cancer (FFPE) dataset
+
+# Base paths
+paths:
+  spaceranger_outs: "../data/spatial"
+  processed: "../data/spatial/processed"
+  figures: "../figures"
+
+# Single sample for this tutorial
+samples:
+  - id: "Visium_HD_Human_Colon_Cancer"
+    name: "CRC_tutorial"
+
+# Analysis parameters
+params:
+  filter_genes_counts: 5
+  filter_cells_counts: 1
+  radius: 60
+  percentile_pct_mito: null
+  pct_mito: 5
+  novae_max_epochs: 50
+  novae_model: "MICS-Lab/novae-human-0"
+  domain_range: [5, 15]
+  clustering_col: "novae_domains_15"
+
+# Marker genes for CRC cell type annotation
+# Source: 10x Genomics Loupe Browser CRC tutorial CSVs (data/markers/*.csv)
+marker_genes:
+  Tumor: ["REG1A", "REG1B", "CEACAM6", "TGFBI"]
+  Fibroblasts: ["COL1A1", "MMP2"]
+  Macrophages: ["LYZ", "SPP1"]
+  Neutrophils: ["SAT1"]
+  Goblet_cells: ["FCGBP", "MUC2", "CLCA1"]

@@ -1,0 +1,5 @@
+List,Name,ID,FeatureType
+Tumor,REG1A,ENSG00000115386,Gene Expression
+Tumor,REG1B,ENSG00000172023,Gene Expression
+Tumor,CEACAM6,ENSG00000086548,Gene Expression
+Tumor,TGFBI,ENSG00000120708,Gene Expression

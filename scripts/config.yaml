@@ -1,0 +1,182 @@
+# Spatial Transcriptomics Configuration
+# Comment out samples by adding # in front
+
+# Base paths
+paths:
+  spaceranger_outs: "/mnt/archive/RO_src/data/spatial/GCF1043-SpaceRanger"
+  microscopy: "/mnt/archive/RO_src/data/spatial/GCF-1043-Microscopy"
+  processed: "/mnt/archive/RO_src/data/spatial/processed"
+  segmented: "/mnt/archive/RO_src/data/spatial/processed/concatenated_binned_05012026.zarr"
+
+# Active samples (comment out to exclude)
+samples:
+  - id: "A1-GA-DCUA1"
+    name: "SFH43/21.1"
+    image: "Image_GADCUA1-20x.ome.tif"
+  
+  - id: "A1-GC-AHZT1"
+    name: "SFH180/20"
+    image: "Image_GCAHZT1-20x.ome.tif"
+  
+  - id: "D1-GA-GDUA1"
+    name: "SFH74/21.1A"
+    image: "Image_GAGDUA1-20x.ome.tif"
+  
+  # Uncomment to include:
+  # - id: "D1-GC-BBBA1"
+  #   name: "SFH22/21"
+  #   image: "Image_GCBBBA1-20x.ome.tif"
+
+# Analysis parameters
+params:
+  filter_genes_counts: 5
+  filter_cells_counts: 1
+  radius: 60
+  percentile_pct_mito: null
+  pct_mito: 5
+
+# # Marker genes for cell type annotation
+# marker_genes:
+#   # ============ SCLC SUBTYPES ============
+#   SCLC_A: ["ASCL1", "DLL3", "CHGA", "SYP", "INSM1", "GRP", "NCAM1", "CALCA"]
+#   SCLC_N: ["NEUROD1", "CHGA", "SYP", "INSM1", "HES6", "NRCAM"]
+#   # SCLC_P: ["POU2F3", "ASCL2", "SOX9", "TRPM5", "GFI1B", "CHAT"]
+#   SCLC_I: ["YAP1", "REST", "NOTCH1", "NOTCH2", "HES1", "TAZ", "PDCD1", "CD274", "LAG3", "CTLA4", "TIGIT", "HAVCR2","TAP1", "TAP2", "B2M", "HLA-A", "HLA-C"]
+#   # NE: ["CHGA", "DLL3", "NEUROD1", "INSM1", "ASCL1","SYP","ENO2","NCAM1"]
+#   # nonNE: ["YAP1", "POU2F3", "MYC", "NOTCH1","REST"]
+  
+#   # ============ LYMPHOID ============
+#   T_cell: ['CD2', 'CD3D', 'CD3E', 'CD3G', 'CD52', 'CD7', 'CLEC2D', 'CXCR4', 'IL32', 'IL7R', 'JUNB', 'LCK', 'LTB', 'S100A4', 'TRAC', 'TRBC2']
+#   B_cell: ['BCL11A', 'CD52', 'CD74', 'CD79A', 'CD79B', 'CXCR4', 'HLA-DRA', 'IGHM', 'IGLC2', 'VPREB3']
+#   Plasma: ["MZB1", "JCHAIN", "IGHG1", "SDC1", "XBP1"]
+#   NK: ['CCL4', 'CCL5', 'CD2', 'CD69', 'CST7', 'CTSW', 'CXCR4', 'GNLY', 'GZMA', 'GZMB', 'GZMH', 'HOPX', 'IL2RG', 'KLRD1', 'NKG7', 'S100A4']
+#   T-eff: ["CD8A", "GZMA", "GZMB", "PRF1", "IFNG", "CXCL9", "CXCL10", "TBX21"]
+#   # T-tox: ['GZMB', 'TRAC']
+  
+#   # ============ MYELOID ============
+#   Macrophage: ['AIF1', 'C5AR1', 'CD36', 'CD74', 'CD83', 'CLEC7A', 'CXCL16', 'CYBB', 'DAB2', 'FCGR3A', 'GPNMB', 'ITGAX', 'LGALS3', 'MAF', 'MS4A4A', 'MS4A7', 'NRP2', 'RBPJ', 'S100A4', 'TREM2', 'TYROBP', 'VSIG4']
+#   Monocyte: ['IFIT1', 'IFIT3', 'IRF7', 'MX1', 'OAS1', 'PLSCR1', 'PSAP', 'PTPRC', 'S100A9']
+#   Dendritic: ['AIF1', 'ANXA1', 'CLEC7A', 'CTSS', 'FTL', 'HLA-A', 'HLA-B', 'HLA-C', 'HLA-DMA', 'HLA-DPA1', 'HLA-DPB1', 'HLA-DQB1', 'HLA-DRA', 'HLA-DRB1', 'LGALS3', 'LST1', 'MACROH2A1', 'PTPRC', 'S100A4', 'S100A9']
+#   Mast: ['CPA3', 'HPGDS', 'KIT', 'RGS13', 'TPSAB1', 'TPSB2', 'VWA5A']
+#   Neutrophil: ['CTSG', 'ELANE', 'LYZ', 'MPO', 'PRTN3', 'S100A4', 'S100A8', 'SERPINB1']
+  
+#   # ============ STROMAL ============
+#   Fibroblast: ['C1S', 'CCN2', 'CDH11', 'COL1A1', 'COL1A2', 'COL3A1', 'COL6A2', 'COL6A3', 'CXCL14', 'DCN', 'EGR1', 'FOSB', 'FSTL1', 'GSN', 'IGFBP6', 'KLF6', 'LUM', 'MGP', 'MMP2', 'S100A4', 'SERPINH1', 'SPARC', 'SPON2', 'STAT3', 'VIM']
+#   Smooth_Muscle: ['ACTA2', 'ACTG2', 'BGN', 'CNN1', 'LMOD1', 'MSRB3', 'MYH11', 'MYL9', 'MYLK', 'NOTCH3', 'PLN', 'SNCG', 'SOD3']
+#   Pericyte: ["RGS5", "PDGFRB", "CSPG4", "KCNJ8", "ABCC9"]
+#   Endothelial: ['ADGRL4', 'CALCRL', 'CAV1', 'CCN2', 'CD34', 'CD9', 'CDH5', 'CLDN5', 'CLEC14A', 'ECSCR', 'EGFL7', 'EMCN', 'EMP1', 'ENG', 'EPAS1', 'FLT1', 'GNG11', 'HYAL2', 'ID1', 'ID3', 'IFI27', 'IGFBP7', 'MGP', 'NHERF2', 'PCAT19', 'PECAM1', 'RNASE1', 'S100A10', 'S100A13', 'SPARC', 'SPARCL1', 'SRGN', 'TGFBR2', 'TIMP3', 'TM4SF1', 'VWF']
+#   Lymphatic_EC: ["PROX1", "LYVE1", "PDPN", "CCL21", "FLT4"]
+#   # Epithelial: ['CD24', 'EPCAM']
+  
+#   # ============ EPITHELIAL ============
+#   AT1: ["AGER", "PDPN", "HOPX", "CAV1", "CLIC5"]
+#   AT2: ['ABCA3', 'ADGRF5', 'CLDN18', 'CXCL2', 'LAMP3', 'LPCAT1', 'MUC1', 'NAPSA', 'NKX2-1', 'PGC', 'PIGR', 'SFTA2', 'SFTPA1', 'SFTPB', 'SFTPC', 'SFTPD', 'SLC34A2']
+#   Club: ["SCGB1A1", "SCGB3A1", "SCGB3A2", "CYP2F1"]
+#   Ciliated: ["FOXJ1", "DNAH5", "PIFO", "RSPH1", "TPPP3"]
+#   Basal: ["KRT5", "KRT15", "KRT17", "TP63", "NGFR", "S100A2"]
+#   Goblet: ["MUC5AC", "MUC5B", "SPDEF", "FOXA3", "AGR2"]
+  
+#   # ============ OTHER ============
+#   #Cancer_Stem: ["CD44", "ALDH1A1", "SOX2", "NANOG", "CD133", "ABCG2"]
+#   # CAF: ["FAP", "ACTA2", "PDPN", "S100A4", "PDGFRA", "PDGFRB", "THY1"]
+#   #EMT: ["ZEB1", "ZEB2", "SNAI1", "SNAI2", "TWIST1", "VIM", "CDH2"]
+#   #Checkpoint: ["PDCD1", "CD274", "LAG3", "CTLA4", "TIGIT", "HAVCR2"]
+#   #APM: ["TAP1", "TAP2", "B2M", "HLA-A", "HLA-C"]
+
+marker_genes_grouped:
+  # SCLC-A (neuroendocrine, ASCL1-driven)
+  SCLC_A: ["ASCL1", "DLL3", "CHGA", "SYP", "INSM1", "GRP", "NCAM1", "CALCA"]
+
+  # SCLC-N (neuroendocrine, NEUROD1-driven)
+  SCLC_N: ["NEUROD1", "CHGA", "SYP", "INSM1", "HES6", "NRCAM"]
+
+  # Non-neuroendocrine (merged: SCLC_P, SCLC_I, NE_low, nonNE)
+  nonNE: ["ASCL2", "B2M", "CHAT", "GFI1B", "HES1", "MYC", "NOTCH1", "NOTCH2", "POU2F3", "REST", "SOX9", "TAZ", "TRPM5", "YAP1"]
+
+  # Lymphoid (merged: T_cell, B_cell, Plasma, NK, T-eff, T-tox)
+  lymphoid: ["BCL11A", "CCL4", "CCL5", "CD2", "CD3D", "CD3E", "CD3G", "CD52", "CD69", "CD7", "CD74", "CD79A", "CD79B", "CD8A", "CLEC2D", "CST7", "CTSW", "CXCL10", "CXCL9", "CXCR4", "GNLY", "GZMA", "GZMB", "GZMH", "HLA-DRA", "HOPX", "IFNG", "IGHG1", "IGHM", "IGLC2", "IL2RG", "IL32", "IL7R", "JCHAIN", "JUNB", "KLRD1", "LCK", "LTB", "MZB1", "NKG7", "PRF1", "S100A4", "SDC1", "TBX21", "TRAC", "TRBC2", "VPREB3", "XBP1"]
+
+  # Myeloid (merged: Macrophage, Monocyte, Dendritic, Mast, Neutrophil)
+  myeloid: ["AIF1", "ANXA1", "C5AR1", "CD36", "CD74", "CD83", "CLEC7A", "CPA3", "CTSG", "CTSS", "CXCL16", "CYBB", "DAB2", "ELANE", "FCGR3A", "FTL", "GPNMB", "HLA-A", "HLA-B", "HLA-C", "HLA-DMA", "HLA-DPA1", "HLA-DPB1", "HLA-DQB1", "HLA-DRA", "HLA-DRB1", "HPGDS", "IFIT1", "IFIT3", "IRF7", "ITGAX", "KIT", "LGALS3", "LST1", "LYZ", "MACROH2A1", "MAF", "MPO", "MS4A4A", "MS4A7", "MX1", "NRP2", "OAS1", "PLSCR1", "PRTN3", "PSAP", "PTPRC", "RBPJ", "RGS13", "S100A4", "S100A8", "S100A9", "SERPINB1", "TPSAB1", "TPSB2", "TREM2", "TYROBP", "VSIG4", "VWA5A"]
+
+  # Stromal (merged: Fibroblast, Smooth_Muscle, Pericyte, Endothelial, Lymphatic_EC, CAF)
+  stromal: ["ABCC9", "ACTA2", "ACTG2", "ADGRL4", "BGN", "C1S", "CALCRL", "CAV1", "CCL21", "CCN2", "CD34", "CD9", "CDH11", "CDH5", "CLDN5", "CLEC14A", "CNN1", "COL1A1", "COL1A2", "COL3A1", "COL6A2", "COL6A3", "CSPG4", "CXCL14", "DCN", "ECSCR", "EGFL7", "EGR1", "EMCN", "EMP1", "ENG", "EPAS1", "FAP", "FLT1", "FLT4", "FOSB", "FSTL1", "GNG11", "GSN", "HYAL2", "ID1", "ID3", "IFI27", "IGFBP6", "IGFBP7", "KCNJ8", "KLF6", "LMOD1", "LUM", "LYVE1", "MGP", "MMP2", "MSRB3", "MYH11", "MYL9", "MYLK", "NHERF2", "NOTCH3", "PCAT19", "PDGFRA", "PDGFRB", "PDPN", "PECAM1", "PLN", "PROX1", "RGS5", "RNASE1", "S100A10", "S100A13", "S100A4", "SERPINH1", "SNCG", "SOD3", "SPARC", "SPARCL1", "SPON2", "SRGN", "STAT3", "TGFBR2", "THY1", "TIMP3", "TM4SF1", "VIM", "VWF"]
+
+  # Epithelial (merged: Epithelial, AT1, AT2, Club, Ciliated, Basal, Goblet)
+  epithelial: ["ABCA3", "ADGRF5", "AGER", "AGR2", "CAV1", "CD24", "CLDN18", "CLIC5", "CYP2F1", "CXCL2", "DNAH5", "EPCAM", "FOXA3", "FOXJ1", "HOPX", "KRT15", "KRT17", "KRT5", "LAMP3", "LPCAT1", "MUC1", "MUC5AC", "MUC5B", "NAPSA", "NGFR", "NKX2-1", "PDPN", "PGC", "PIFO", "PIGR", "RSPH1", "S100A2", "SCGB1A1", "SCGB3A1", "SCGB3A2", "SFTA2", "SFTPA1", "SFTPB", "SFTPC", "SFTPD", "SLC34A2", "SPDEF", "TP63", "TPPP3"]
+
+# =============================================================================
+# CURATED MARKER GENES (OVERLAPPING) - kept for reference
+# =============================================================================
+# marker_genes_overlapping:
+#   # ============ SCLC SUBTYPES ============
+#   SCLC_A: ["ASCL1", "DLL3", "CHGA", "SYP", "INSM1", "GRP", "NCAM1", "CALCA", "ENO2", "BEX1", "PCSK1", "SCG2", "DDC"]
+#   SCLC_N: ["NEUROD1", "CHGA", "SYP", "INSM1", "HES6", "NRCAM", "NEUROD2", "NEUROD4", "MYT1", "L1CAM"]
+#   # SCLC_I: ["YAP1", "REST", "NOTCH1", "NOTCH2", "HES1", "TAZ", "WWTR1", "TEAD1", "TEAD4", "CTGF", "CYR61"]
+#   nonNE: ["YAP1", "POU2F3", "MYC", "NOTCH1", "REST", "HES1", "MYCL"]
+#   # ============ LYMPHOID ============
+#   T_cell: ["CD2", "CD3D", "CD3E", "CD3G", "CD247", "CD7", "TRAC", "TRBC1", "TRBC2", "LCK", "IL7R", "IL32", "CD52", "THEMIS", "TCF7", "LEF1"]
+#   T_CD4: ["CD4", "CD3D", "CD3E", "IL7R", "CD40LG", "FOXP3", "IL2RA", "CTLA4", "ICOS"]
+#   T_CD8: ["CD8A", "CD8B", "CD3D", "CD3E", "GZMA", "GZMB", "GZMK", "GZMH", "PRF1", "NKG7", "IFNG", "CCL5"]
+#   T_reg: ["FOXP3", "IL2RA", "CTLA4", "ICOS", "TIGIT", "CD4", "CCR8", "TNFRSF4", "TNFRSF18", "IKZF2"]
+#   T_exhausted: ["PDCD1", "LAG3", "HAVCR2", "TIGIT", "CTLA4", "TOX", "TOX2", "ENTPD1", "BTLA", "CD244"]
+#   B_cell: ["CD19", "CD79A", "CD79B", "MS4A1", "CD22", "PAX5", "BLK", "BANK1", "FCRL2", "TCL1A", "IGHM", "IGHD"]
+#   Plasma: ["MZB1", "JCHAIN", "IGHG1", "IGHG2", "IGHG3", "IGHA1", "SDC1", "XBP1", "PRDM1", "CD38", "TNFRSF17", "IGKC"]
+#   NK: ["NCAM1", "NKG7", "GNLY", "KLRD1", "KLRB1", "KLRC1", "KLRF1", "NCR1", "FCGR3A", "PRF1", "GZMB", "CCL5", "CTSW", "HOPX"]
+#   # ============ MYELOID ============
+#   Macrophage: ["CD68", "CD163", "CSF1R", "MRC1", "MSR1", "MARCO", "C1QA", "C1QB", "C1QC", "APOE", "TREM2", "LGMN", "MS4A4A", "MS4A7", "FCGR3A", "MERTK", "AIF1", "ITGAM"]
+#   M1_Macro: ["CD68", "NOS2", "IL1B", "IL6", "TNF", "CXCL9", "CXCL10", "CXCL11", "CCL5", "IRF5", "STAT1", "CD80", "CD86", "FCGR1A", "HLA-DRA"]
+#   M2_Macro: ["CD163", "MRC1", "ARG1", "IL10", "CCL18", "CCL22", "TGFB1", "VEGFA", "MMP9", "STAB1", "FOLR2", "MAF"]
+#   Monocyte: ["CD14", "LYZ", "S100A8", "S100A9", "S100A12", "FCN1", "VCAN", "CCR2", "CSF1R", "ITGAM", "CD68", "MNDA"]
+#   Dendritic: ["CD1C", "CLEC9A", "CLEC10A", "CD83", "CD86", "HLA-DRA", "HLA-DRB1", "HLA-DQA1", "HLA-DQB1", "FCER1A", "ITGAX", "BATF3", "IRF8", "CLEC4C", "IL3RA", "LILRA4", "TCF4", "IRF7", "NRP1"]
+#   Mast: ["KIT", "CPA3", "TPSAB1", "TPSB2", "MS4A2", "FCER1A", "HPGDS", "HDC", "GATA2", "RGS13"]
+#   Neutrophil: ["S100A8", "S100A9", "S100A12", "FCGR3B", "CSF3R", "CXCR2", "ELANE", "MPO", "LYZ", "CTSG", "AZU1", "PRTN3"]
+#   # ============ STROMAL ============
+#   Fibroblast: ["COL1A1", "COL1A2", "COL3A1", "COL6A1", "COL6A2", "DCN", "LUM", "PDGFRA", "FAP", "THY1", "VIM", "PDPN", "C1S", "C1R", "SPARC", "SERPINH1"]
+#   CAF: ["FAP", "PDGFRA", "S100A4", "POSTN", "THY1", "CXCL12", "IL6", "MMP2", "MMP11", "LRRC15"]
+#   Smooth_Muscle: ["ACTA2", "ACTG2", "MYH11", "MYL9", "MYLK", "CNN1", "TAGLN", "DES", "LMOD1", "PLN", "NOTCH3"]
+#   Pericyte: ["RGS5", "PDGFRB", "CSPG4", "KCNJ8", "ABCC9", "ACTA2", "NOTCH3", "MCAM", "ANPEP", "DES"]
+#   Endothelial: ["PECAM1", "CDH5", "VWF", "CD34", "CLDN5", "ENG", "FLT1", "KDR", "TIE1", "TEK", "EMCN", "PLVAP", "ACKR1", "SELE", "ICAM1"]
+#   AT1: ["AGER", "PDPN", "HOPX", "CAV1", "CLIC5", "EMP2", "RTKN2", "AKAP5"]
+#   AT2: ["SFTPC", "SFTPB", "SFTPA1", "SFTPA2", "SFTPD", "ABCA3", "NAPSA", "NKX2-1", "LAMP3", "SLC34A2", "LPCAT1", "PGC", "MUC1"]
+#   Ciliated: ["FOXJ1", "DNAH5", "PIFO", "RSPH1", "TPPP3", "CAPS", "CCDC78", "DNALI1", "CFAP126"]
+#   Basal: ["KRT5", "KRT15", "KRT17", "TP63", "NGFR", "S100A2", "KRT14", "ITGA6", "ITGB4"]
+#   Secretory_Epithelial: ["SCGB1A1", "SCGB3A1", "SCGB3A2", "CYP2F1", "BPIFB1", "MUC5AC", "MUC5B", "SPDEF", "FOXA3", "AGR2", "TFF3", "FCGBP", "CLCA1", "CP", "HP"]
+#   # Checkpoint: ["PDCD1", "CD274", "PDCD1LG2", "LAG3", "CTLA4", "TIGIT", "HAVCR2", "BTLA", "VSIR", "CD276", "TNFRSF9"]
+#   # APM: ["TAP1", "TAP2", "B2M", "HLA-A", "HLA-B", "HLA-C", "PSMB8", "PSMB9", "CALR", "CANX"]
+
+# =============================================================================
+# NON-OVERLAPPING MARKER GENES - Broad categories, unique genes per cell type
+# Sources: PanglaoDB, CellMarker 2.0, literature
+# =============================================================================
+marker_genes:
+  # ============ SCLC SUBTYPES ============
+  SCLC_A: ["ASCL1", "DLL3", "CHGA", "SYP", "INSM1", "GRP", "CALCA", "ENO2", "BEX1", "PCSK1", "SCG2", "DDC","SOX2"]
+  SCLC_N: ["NEUROD1", "NEUROD2", "NEUROD4", "HES6", "NRCAM", "MYT1", "L1CAM","MYC","LSD1"]
+  nonNE: ["YAP1", "POU2F3",  "NOTCH1", "REST", "HES1"]
+
+  # ============ LYMPHOID ============
+  T_cell: ["CD3D", "CD3E", "CD2", "TRAC", "TRBC2", "LCK", "THEMIS", "TCF7", "LEF1", "IL7R", "CD4", "CD8A", "CD8B", "GZMA", "GZMK", "GZMH", "FOXP3"]
+  B_cell: ["CD19", "CD79A", "CD79B", "MS4A1", "CD22", "PAX5", "BLK", "BANK1", "FCRL2", "TCL1A", "IGHM", "IGHD"]
+  Plasma: ["MZB1", "JCHAIN", "IGHG1", "IGHG2", "IGHG3", "IGHA1", "SDC1", "XBP1", "PRDM1", "CD38", "TNFRSF17", "IGKC"]
+  NK: ["NCAM1", "NKG7", "GNLY", "KLRD1", "KLRB1", "KLRC1", "KLRF1", "NCR1", "PRF1", "GZMB", "CTSW", "CCL5"]
+
+  # ============ MYELOID ============
+  Macrophage: ["CD68", "CD163", "CSF1R", "MRC1", "MSR1", "MARCO", "C1QA", "C1QB", "C1QC", "APOE", "TREM2", "LGMN", "MS4A4A", "MERTK", "AIF1"]
+  Monocyte: ["CD14", "LYZ", "S100A8", "S100A9", "S100A12", "FCN1", "VCAN", "CCR2", "MNDA"]
+  Dendritic: ["CD1C", "CLEC9A", "CLEC10A", "CD83", "CD86", "ITGAX", "BATF3", "IRF8", "CLEC4C", "IL3RA", "LILRA4", "TCF4", "IRF7", "NRP1"]
+  Mast: ["KIT", "CPA3", "TPSAB1", "TPSB2", "MS4A2", "FCER1A", "HPGDS", "HDC", "GATA2", "RGS13"]
+  Neutrophil: ["FCGR3B", "CSF3R", "CXCR2", "ELANE", "MPO", "CTSG", "AZU1", "PRTN3"]
+
+  # ============ STROMAL ============
+  Fibroblast: ["COL1A1", "COL1A2", "COL3A1", "COL6A1", "COL6A2", "DCN", "LUM", "PDGFRA", "FAP", "C1S", "C1R", "SPARC", "SERPINH1", "POSTN"]
+  Smooth_Muscle: ["ACTA2", "ACTG2", "MYH11", "MYL9", "MYLK", "CNN1", "TAGLN", "DES", "LMOD1", "PLN"]
+  Pericyte: ["RGS5", "PDGFRB", "CSPG4", "KCNJ8", "ABCC9", "NOTCH3", "MCAM", "ANPEP"]
+  Endothelial: ["PECAM1", "CDH5", "VWF", "CD34", "CLDN5", "ENG", "FLT1", "KDR", "TIE1", "TEK", "EMCN", "PLVAP", "ACKR1", "SELE", "ICAM1"]
+
+  # ============ EPITHELIAL ============
+  AT1: ["AGER", "PDPN", "HOPX", "CAV1", "CLIC5", "EMP2", "RTKN2", "AKAP5"]
+  AT2: ["SFTPC", "SFTPB", "SFTPA1", "SFTPA2", "SFTPD", "ABCA3", "NAPSA", "NKX2-1", "LAMP3", "SLC34A2", "LPCAT1", "PGC", "MUC1"]
+  Ciliated: ["FOXJ1", "DNAH5", "PIFO", "RSPH1", "TPPP3", "CAPS", "CCDC78", "DNALI1", "CFAP126"]
+  Basal: ["KRT5", "KRT15", "KRT17", "TP63", "NGFR", "S100A2", "KRT14", "ITGA6", "ITGB4"]
+  Secretory_Epithelial: ["SCGB1A1", "SCGB3A1", "SCGB3A2", "CYP2F1", "BPIFB1", "MUC5AC", "MUC5B", "SPDEF", "FOXA3", "AGR2", "TFF3", "FCGBP", "CLCA1", "CP", "HP"]
