@@ -125,9 +125,12 @@ def filter_isolated_regions(
             adata.obs[
                 "spatial_region"
             ].apply(
-                lambda x: "main"
-                if x in large_regions
-                else "island"
+                lambda x: (
+                    "main"
+                    if x
+                    in large_regions
+                    else "island"
+                )
             )
         )
 

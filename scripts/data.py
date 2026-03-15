@@ -11,6 +11,7 @@ import enrichmap as em
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import novae
+import numpy as np
 import pandas as pd
 import scanpy as sc
 import seaborn as sns
@@ -18,13 +19,6 @@ import sopa
 import spatialdata as sd
 import yaml
 from loguru import logger
-
-from filtering import (
-    filter_spatial_anndata,
-)
-from preprocessing import (
-    preprocess_adatas,
-)
 
 # Matplotlib defaults
 mpl.rcParams["figure.dpi"] = 300
@@ -176,33 +170,157 @@ logger.info(
 adata = sdata["table"].copy()
 
 # Filter genes and cells
-adatas = filter_spatial_anndata(
-    concatenated_adata=adata,
-    sample_list_names=[sample_id],
-    filter_cells_counts=params[
-        "filter_cells_counts"
-    ],
-    filter_genes_counts=params[
+logger.info(
+    f"AnnData shape before filtering: {adata.shape}"
+)
+sc.pp.filter_genes(
+    adata,
+    min_counts=params[
         "filter_genes_counts"
     ],
-    slide_key="sample_id",
+)
+sc.pp.filter_cells(
+    adata,
+    min_counts=params[
+        "filter_cells_counts"
+    ],
+)
+logger.info(
+    f"AnnData shape after filtering: {adata.shape}"
 )
 
-# Preprocess: QC, mito filtering, spatial neighbors, HVGs
-adatas, adata_concat = (
-    preprocess_adatas(
-        adatas=adatas,
-        spatial_radius=params["radius"],
-        slide_key="sample_id",
-        sample_list_names=[sample_id],
-        use_highly_variable_genes=True,
-        run_dir=str(run_dir),
-        percentile_pct_mito=params[
-            "percentile_pct_mito"
-        ],
-        pct_mito=params["pct_mito"],
-        vmax=99,
+# QC metrics
+vmax_pct = 99
+adata.var["mt"] = (
+    adata.var_names.str.startswith(
+        ("MT-", "mt-")
     )
+)
+sc.pp.calculate_qc_metrics(
+    adata,
+    inplace=True,
+    percent_top=None,
+)
+sc.pp.calculate_qc_metrics(
+    adata,
+    qc_vars=["mt"],
+    inplace=True,
+    percent_top=None,
+)
+
+# Plot n_counts embedding
+fig = sc.pl.embedding(
+    adata,
+    basis="spatial",
+    color="n_counts",
+    vmin=np.percentile(
+        adata.obs["n_counts"], 1
+    ),
+    vmax=np.percentile(
+        adata.obs["n_counts"], vmax_pct
+    ),
+    size=8,
+    show=False,
+    return_fig=True,
+)
+fig.savefig(
+    f"{run_dir}/n_counts_embedding_{sample_id}.png",
+    bbox_inches="tight",
+    dpi=150,
+)
+plt.close(fig)
+
+# Plot mito embedding
+fig = sc.pl.embedding(
+    adata,
+    basis="spatial",
+    color="pct_counts_mt",
+    vmin=np.percentile(
+        adata.obs["pct_counts_mt"], 1
+    ),
+    vmax=np.percentile(
+        adata.obs["pct_counts_mt"],
+        vmax_pct,
+    ),
+    size=8,
+    show=False,
+    return_fig=True,
+)
+fig.savefig(
+    f"{run_dir}/pct_counts_mt_embedding_{sample_id}.png",
+    bbox_inches="tight",
+    dpi=150,
+)
+plt.close(fig)
+
+# Filter high mito cells
+percentile_pct_mito = params[
+    "percentile_pct_mito"
+]
+pct_mito = params["pct_mito"]
+if percentile_pct_mito is not None:
+    pct_to_remove = adata.obs[
+        "pct_counts_mt"
+    ].quantile(percentile_pct_mito)
+else:
+    pct_to_remove = pct_mito
+
+adata = adata[
+    adata.obs["pct_counts_mt"]
+    < pct_to_remove
+].copy()
+logger.info(
+    f"After mito filtering ({pct_to_remove}%): {adata.shape}"
+)
+
+# Plot mito embedding after filtering
+fig = sc.pl.embedding(
+    adata,
+    basis="spatial",
+    color="pct_counts_mt",
+    size=8,
+    show=False,
+    return_fig=True,
+)
+fig.savefig(
+    f"{run_dir}/mt_embedding_after_filtering_{sample_id}.png",
+    bbox_inches="tight",
+    dpi=150,
+)
+plt.close(fig)
+
+# Compute spatial neighbors
+logger.info(
+    "Computing spatial neighbors."
+)
+spatial_radius = params["radius"]
+novae.spatial_neighbors(
+    [adata],
+    radius=spatial_radius,
+    slide_key="sample_id",
+    coord_type="generic",
+)
+
+# Plot connectivities
+novae.plot.connectivities([adata])
+plt.savefig(
+    f"{run_dir}/connectivities.png",
+    dpi=600,
+    bbox_inches="tight",
+)
+plt.close()
+
+# Novae preprocessing (normalize, log1p, HVGs)
+logger.info("Preprocessing with Novae")
+novae.utils.prepare_adatas([adata])
+adata.layers["lognorm_counts"] = (
+    adata.X.copy()
+)
+
+# PCA
+logger.info("Running PCA")
+sc.pp.pca(
+    adata, use_highly_variable=True
 )
 
 # Novae clustering
@@ -213,7 +331,7 @@ model = novae.Novae.from_pretrained(
     params["novae_model"]
 )
 model.fine_tune(
-    adatas,
+    [adata],
     max_epochs=params[
         "novae_max_epochs"
     ],
@@ -225,7 +343,7 @@ model.save_pretrained(
 logger.info(
     "Computing Novae representations..."
 )
-model.compute_representations(adatas)
+model.compute_representations([adata])
 
 # Assign domains across a range of resolutions
 domain_min, domain_max = params[
@@ -236,26 +354,25 @@ for n_domains in range(
 ):
     col = f"novae_domains_{n_domains}"
     model.assign_domains(
-        adatas, level=n_domains
+        [adata], level=n_domains
     )
     model.batch_effect_correction(
-        adatas, obs_key=col
+        [adata], obs_key=col
     )
 
-    for data in adatas:
-        data.obsm[
-            f"novae_latent_{n_domains}"
-        ] = data.obsm[
-            "novae_latent"
-        ].copy()
-        data.obsm[
-            f"novae_latent_corrected_{n_domains}"
-        ] = data.obsm[
-            "novae_latent_corrected"
-        ].copy()
+    adata.obsm[
+        f"novae_latent_{n_domains}"
+    ] = adata.obsm[
+        "novae_latent"
+    ].copy()
+    adata.obsm[
+        f"novae_latent_corrected_{n_domains}"
+    ] = adata.obsm[
+        "novae_latent_corrected"
+    ].copy()
 
     novae.plot.domains(
-        adatas,
+        [adata],
         slide_name_key="sample_id",
         cell_size=8,
         show=False,
@@ -272,7 +389,7 @@ for n_domains in range(
     plt.close()
 
     novae.plot.domains_proportions(
-        adatas, obs_key=col, show=False
+        [adata], obs_key=col, show=False
     )
     plt.savefig(
         str(
@@ -285,15 +402,14 @@ for n_domains in range(
     plt.close()
 
 # Save clustered AnnData
-adata_clustered = adatas[0]
-adata_clustered.write_h5ad(
+adata.write_h5ad(
     str(
         run_dir
         / f"{sample_id}_clustered.h5ad"
     )
 )
 logger.info(
-    f"Saved clustered AnnData: {adata_clustered.shape}"
+    f"Saved clustered AnnData: {adata.shape}"
 )
 
 # %%
@@ -344,23 +460,17 @@ logger.info(
 )
 
 # Ensure we use raw counts for enrichmap (lognorm layer was saved during preprocessing)
-if (
-    "lognorm_counts"
-    in adata_clustered.layers
-):
-    adata_clustered.X = (
-        adata_clustered.layers[
-            "lognorm_counts"
-        ].copy()
-    )
+if "lognorm_counts" in adata.layers:
+    adata.X = adata.layers[
+        "lognorm_counts"
+    ].copy()
 
 # Filter marker genes to those present in the data
 marker_genes_filtered = {
     ct: [
         g
         for g in genes
-        if g
-        in adata_clustered.var_names
+        if g in adata.var_names
     ]
     for ct, genes in marker_genes.items()
 }
@@ -378,7 +488,7 @@ logger.info(
     "Running Enrichmap scoring..."
 )
 em.tl.score(
-    adata=adata_clustered,
+    adata=adata,
     gene_set=marker_genes_filtered,
     smoothing=True,
     correct_spatial_covariates=True,
@@ -388,7 +498,7 @@ em.tl.score(
 # Identify top cell type per domain
 score_cols = [
     col
-    for col in adata_clustered.obs.columns
+    for col in adata.obs.columns
     if col.endswith("_score")
 ]
 logger.info(
@@ -396,31 +506,29 @@ logger.info(
 )
 
 # Assign cell type as the highest scoring marker set per cell
-score_df = adata_clustered.obs[
-    score_cols
-].copy()
+score_df = adata.obs[score_cols].copy()
 score_df.columns = [
     col.replace("_score", "")
     for col in score_cols
 ]
-adata_clustered.obs[
-    "cell_type_enrichmap"
-] = score_df.idxmax(axis=1)
+adata.obs["cell_type_enrichmap"] = (
+    score_df.idxmax(axis=1)
+)
 
 # Per-domain majority vote for cleaner labels
-domain_ct = adata_clustered.obs.groupby(
+domain_ct = adata.obs.groupby(
     clustering_col
 )["cell_type_enrichmap"].agg(
     lambda x: x.value_counts().index[0]
 )
-adata_clustered.obs[
-    "cell_type_domain"
-] = adata_clustered.obs[
-    clustering_col
-].map(domain_ct)
+adata.obs["cell_type_domain"] = (
+    adata.obs[clustering_col].map(
+        domain_ct
+    )
+)
 
 logger.info(
-    f"Cell type distribution:\n{adata_clustered.obs['cell_type_domain'].value_counts()}"
+    f"Cell type distribution:\n{adata.obs['cell_type_domain'].value_counts()}"
 )
 
 # %%
@@ -431,7 +539,7 @@ logger.info("=== Generating plots ===")
 
 # Spatial embedding colored by cell type
 sc.pl.embedding(
-    adata_clustered,
+    adata,
     basis="spatial",
     color="cell_type_domain",
     size=8,
@@ -449,11 +557,9 @@ plt.savefig(
 plt.close()
 
 # Enrichmap score heatmap per domain
-score_by_domain = (
-    adata_clustered.obs.groupby(
-        clustering_col
-    )[score_cols].mean()
-)
+score_by_domain = adata.obs.groupby(
+    clustering_col
+)[score_cols].mean()
 score_by_domain.columns = [
     col.replace("_score", "")
     for col in score_by_domain.columns
@@ -493,7 +599,7 @@ plt.close()
 
 # Dotplot of marker genes by cell type domain
 sc.pl.dotplot(
-    adata_clustered,
+    adata,
     var_names=marker_genes_filtered,
     groupby="cell_type_domain",
     show=False,
@@ -515,7 +621,7 @@ plt.close()
 logger.info(
     "Saving final annotated AnnData..."
 )
-adata_clustered.write_h5ad(
+adata.write_h5ad(
     str(
         run_dir
         / f"{sample_id}_annotated.h5ad"
