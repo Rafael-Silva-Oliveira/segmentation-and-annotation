@@ -3,7 +3,7 @@
 
 # Base paths
 paths:
-  spaceranger_outs: "../data/spatial"
+  spaceranger_outs: "../data/spatial/SpaceRanger"
   processed: "../data/spatial/processed"
   figures: "../figures"
 

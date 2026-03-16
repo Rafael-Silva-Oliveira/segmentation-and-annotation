@@ -35,9 +35,15 @@ plt.rcParams.update(
 # =============================================================================
 # PATHS & CONFIG
 # =============================================================================
-SCRIPT_DIR = (
-    Path(__file__).resolve().parent
-)
+try:
+    SCRIPT_DIR = (
+        Path(__file__).resolve().parent
+    )
+except NameError:
+    # Running in a notebook
+    SCRIPT_DIR = Path(
+        r"C:\Users\rafae\Projects\segmentation-and-annotation\scripts"
+    )
 PROJECT_DIR = SCRIPT_DIR.parent
 CONFIG_PATH = (
     SCRIPT_DIR
@@ -90,15 +96,57 @@ logger.info(
     "=== STEP 1: Reading Visium HD data and running segmentation ==="
 )
 
+OUTS_DIR = (
+    SPACERANGER_OUTS
+    / sample_id
+    / "outs"
+).resolve()
+
+# %%
 sdata = sopa.io.visium_hd(
-    str(
-        SPACERANGER_OUTS
-        / sample_id
-        / "outs"
+    r"C:\Users\rafae\Projects\segmentation-and-annotation\data\spatial\SpaceRanger\Visium_HD_Human_Colon_Cancer\outs",
+    dataset_id="Visium_HD_Human_Colon_Cancer",
+    fullres_image_file=str(
+        PROJECT_DIR
+        / "data"
+        / "spatial"
+        / "Microscopy"
+        / "Visium_HD_Human_Colon_Cancer_tissue_image.btf"
     ),
-    dataset_id="",
 )
 
+
+# %%
+# Crop to a smaller region for faster processing
+sdata_sub = sd.bounding_box_query(
+    sdata,
+    min_coordinate=[43000, 2000],
+    max_coordinate=[60000, 19000],
+    axes=("x", "y"),
+    target_coordinate_system="Visium_HD_Human_Colon_Cancer",
+    filter_table=True,
+)
+
+# %%
+import spatialdata_plot
+
+# Plot the cropped region
+sdata_sub.pl.render_images(
+    "Visium_HD_Human_Colon_Cancer_full_image"
+).pl.show(
+    coordinate_systems="Visium_HD_Human_Colon_Cancer",
+    figsize=(10, 10),
+)
+
+
+# %%
+for (
+    key,
+    table,
+) in sdata_sub.tables.items():
+    table.var_names_make_unique()
+
+# %%
 # Patch-based cell segmentation
 logger.info("Creating image patches...")
 sopa.make_image_patches(sdata)
@@ -126,6 +174,7 @@ sopa.aggregate(
     expand_radius_ratio=1,
 )
 
+# %%
 # Update table metadata
 for size, table in sdata.tables.items():
     table.var_names_make_unique()

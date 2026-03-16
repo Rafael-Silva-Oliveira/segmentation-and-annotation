@@ -319,9 +319,11 @@ def highlight_cell_types(
             adata_sub.obs[
                 "highlight"
             ] = adata_sub.obs[ct].apply(
-                lambda x: x
-                if x == ct
-                else "Other"
+                lambda x: (
+                    x
+                    if x == ct
+                    else "Other"
+                )
             )
 
             sc.pl.embedding(

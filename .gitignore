@@ -1,6 +1,2 @@
 image.png
-data/spatial/Visium_HD_Human_Colon_Cancer_feature_slice.h5
-data/spatial/Visium_HD_Human_Colon_Cancer_image.tif
-data/spatial/Visium_HD_Human_Colon_Cancer_probe_set.csv
-data/spatial/Visium_HD_Human_Colon_Cancer_slide_file.vlf
-data/spatial/Visium_HD_Human_Colon_Cancer_spatial.tar.gz
+data/spatial/
