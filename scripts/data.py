@@ -117,6 +117,7 @@ sdata = sopa.io.visium_hd(
 
 
 # %%
+# TODO: make it smaller, to run segmentation faster
 # Crop to a smaller region for faster processing
 sdata_sub = sd.bounding_box_query(
     sdata,
@@ -149,27 +150,27 @@ for (
 # %%
 # Patch-based cell segmentation
 logger.info("Creating image patches...")
-sopa.make_image_patches(sdata)
+sopa.make_image_patches(sdata_sub)
 
 logger.info(
     "Running StarDist segmentation..."
 )
 sopa.segmentation.stardist(
-    sdata, min_area=20
+    sdata_sub, min_area=20
 )
 
 logger.info(
     "Running ProSeg refinement..."
 )
 sopa.segmentation.proseg(
-    sdata, prior_shapes_key="auto"
+    sdata_sub, prior_shapes_key="auto"
 )
 
 logger.info(
     "Aggregating gene expression to cells..."
 )
 sopa.aggregate(
-    sdata,
+    sdata_sub,
     aggregate_channels=False,
     expand_radius_ratio=1,
 )
