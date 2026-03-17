@@ -1,2 +1,7 @@
 image.png
 data/spatial/
+data/Interactive - data_annotation.ipynb
+data/Interactive - data.py.ipynb
+scripts/test.zarr/zarr.json
+scripts/test.zarr/images/zarr.json
+scripts/test.zarr/images/Visium_HD_Human_Colon_Cancer_full_image/zarr.json

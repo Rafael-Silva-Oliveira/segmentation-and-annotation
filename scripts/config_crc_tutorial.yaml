@@ -14,11 +14,11 @@ samples:
 
 # Analysis parameters
 params:
-  filter_genes_counts: 5
+  filter_genes_counts: 1
   filter_cells_counts: 1
-  radius: 60
+  radius: 50
   percentile_pct_mito: null
-  pct_mito: 5
+  pct_mito: 10
   novae_max_epochs: 50
   novae_model: "MICS-Lab/novae-human-0"
   domain_range: [5, 15]
@@ -30,5 +30,5 @@ marker_genes:
   Tumor: ["REG1A", "REG1B", "CEACAM6", "TGFBI"]
   Fibroblasts: ["COL1A1", "MMP2"]
   Macrophages: ["LYZ", "SPP1"]
-  Neutrophils: ["SAT1"]
+  Neutrophils: ["SAT1", "CSF3R", "FCGR3B", "S100A8"]
   Goblet_cells: ["FCGBP", "MUC2", "CLCA1"]

@@ -4,9 +4,11 @@
 # 10x Genomics Human Colorectal Cancer (FFPE)
 # Steps: Segmentation (01) -> Clustering (02) -> Annotation (03)
 # =============================================================================
+import warnings
 from datetime import datetime
 from pathlib import Path
 
+import decoupler as dc
 import enrichmap as em
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -17,8 +19,17 @@ import scanpy as sc
 import seaborn as sns
 import sopa
 import spatialdata as sd
+import spatialdata_plot
 import yaml
+import zarr
+from anndata import AnnData
 from loguru import logger
+import spatialdata_plot
+
+warnings.filterwarnings(
+    "ignore",
+    message="Use `squidpy.pl.spatial_scatter`",
+)
 
 # Matplotlib defaults
 mpl.rcParams["figure.dpi"] = 300
@@ -35,47 +46,37 @@ plt.rcParams.update(
 # =============================================================================
 # PATHS & CONFIG
 # =============================================================================
-try:
-    SCRIPT_DIR = (
-        Path(__file__).resolve().parent
-    )
-except NameError:
-    # Running in a notebook
-    SCRIPT_DIR = Path(
-        r"C:\Users\rafae\Projects\segmentation-and-annotation\scripts"
-    )
-PROJECT_DIR = SCRIPT_DIR.parent
+PROJECT_DIR = Path(
+    r"C:\Users\rafae\Projects\segmentation-and-annotation"
+).resolve()
 CONFIG_PATH = (
-    SCRIPT_DIR
+    PROJECT_DIR
+    / "scripts"
     / "config_crc_tutorial.yaml"
 )
 
 with open(CONFIG_PATH, "r") as f:
     cfg = yaml.safe_load(f)
 
-SPACERANGER_OUTS = (
-    PROJECT_DIR
-    / cfg["paths"]["spaceranger_outs"]
-)
-PROCESSED_DIR = (
-    PROJECT_DIR
-    / cfg["paths"]["processed"]
-)
-FIGURES_DIR = (
-    PROJECT_DIR
-    / cfg["paths"]["figures"]
-)
-MARKERS_DIR = (
-    PROJECT_DIR / "data" / "markers"
-)
-
 sample_id = cfg["samples"][0]["id"]
 sample_name = cfg["samples"][0]["name"]
 params = cfg["params"]
 marker_genes = cfg["marker_genes"]
 
+PROCESSED_DIR = (
+    PROJECT_DIR
+    / "data"
+    / "spatial"
+    / "processed"
+).resolve()
+FIGURES_DIR = (
+    PROJECT_DIR / "figures"
+).resolve()
+
 run_name = f"crc_tutorial_{datetime.now().strftime('%d%m%Y_%H%M')}"
-run_dir = PROCESSED_DIR / run_name
+run_dir = (
+    PROCESSED_DIR / run_name
+).resolve()
 run_dir.mkdir(
     parents=True, exist_ok=True
 )
@@ -90,22 +91,22 @@ logger.info(
 
 # %%
 # =============================================================================
-# STEP 1 — SEGMENTATION (mirrors 01_THORA_ST_segmentation.py)
+# STEP 1 — SEGMENTATION
 # =============================================================================
 logger.info(
     "=== STEP 1: Reading Visium HD data and running segmentation ==="
 )
 
-OUTS_DIR = (
-    SPACERANGER_OUTS
-    / sample_id
-    / "outs"
-).resolve()
-
-# %%
 sdata = sopa.io.visium_hd(
-    r"C:\Users\rafae\Projects\segmentation-and-annotation\data\spatial\SpaceRanger\Visium_HD_Human_Colon_Cancer\outs",
-    dataset_id="Visium_HD_Human_Colon_Cancer",
+    str(
+        PROJECT_DIR
+        / "data"
+        / "spatial"
+        / "SpaceRanger"
+        / sample_id
+        / "outs"
+    ),
+    dataset_id=sample_id,
     fullres_image_file=str(
         PROJECT_DIR
         / "data"
@@ -115,30 +116,27 @@ sdata = sopa.io.visium_hd(
     ),
 )
 
-
 # %%
-# TODO: make it smaller, to run segmentation faster
-# Crop to a smaller region for faster processing
+# Crop to a region with tumor, stroma, and normal mucosa
 sdata_sub = sd.bounding_box_query(
     sdata,
-    min_coordinate=[43000, 2000],
-    max_coordinate=[60000, 19000],
+    min_coordinate=[51000, 9000],
+    max_coordinate=[56000, 14000],
     axes=("x", "y"),
-    target_coordinate_system="Visium_HD_Human_Colon_Cancer",
+    target_coordinate_system=sample_id,
     filter_table=True,
 )
 
-# %%
-import spatialdata_plot
+sdata_sub.write("test.zarr")  # save it
 
+# %%
 # Plot the cropped region
 sdata_sub.pl.render_images(
-    "Visium_HD_Human_Colon_Cancer_full_image"
+    f"{sample_id}_full_image"
 ).pl.show(
-    coordinate_systems="Visium_HD_Human_Colon_Cancer",
+    coordinate_systems=sample_id,
     figsize=(10, 10),
 )
-
 
 # %%
 for (
@@ -163,9 +161,11 @@ logger.info(
     "Running ProSeg refinement..."
 )
 sopa.segmentation.proseg(
-    sdata_sub, prior_shapes_key="auto"
+    sdata_sub,
+    prior_shapes_key="stardist_boundaries",
 )
 
+# %%
 logger.info(
     "Aggregating gene expression to cells..."
 )
@@ -176,48 +176,65 @@ sopa.aggregate(
 )
 
 # %%
-# Update table metadata
-for size, table in sdata.tables.items():
-    table.var_names_make_unique()
-    table.obs["sample_id"] = sample_id
 
+# Plot segmentation overlay
+sdata_sub.pl.render_images(
+    f"{sample_id}_full_image"
+).pl.render_shapes(
+    "stardist_boundaries",
+    outline=True,
+    fill_alpha=0,
+    outline_alpha=0.6,
+    outline_color="yellow",
+).pl.show(
+    coordinate_systems=sample_id,
+    figsize=(12, 12),
+    title="StarDist Cell Segmentation",
+)
+
+# %%
 # Rasterize 2um bins for visualization
-sdata["square_002um"].X = sdata[
+sdata_sub["square_002um"].X = sdata_sub[
     "square_002um"
 ].X.tocsc()
 lazy_bins_image = sd.rasterize_bins(
-    sdata,
+    sdata_sub,
     bins="_square_002um",
     table_name="square_002um",
     row_key="array_row",
     col_key="array_col",
 )
-sdata["gene_expression_2_um"] = (
+sdata_sub["gene_expression_2_um"] = (
     lazy_bins_image
 )
 
+# %%
+
 # Save segmented data
-segmented_path = (
-    PROCESSED_DIR
-    / f"{sample_id}_segmented.zarr"
+segmented_h5ad = (
+    PROJECT_DIR
+    / "data"
+    / "spatial"
+    / "segmented.h5ad"
+)
+sdata_sub.tables["table"].write_h5ad(
+    str(segmented_h5ad)
 )
 logger.info(
-    f"Saving segmented SpatialData to {segmented_path}"
-)
-sdata.write(
-    str(segmented_path), overwrite=True
+    f"Saved segmented table to {segmented_h5ad}"
 )
 
 # %%
 # =============================================================================
-# STEP 2 — CLUSTERING (mirrors 02_THORA_ST_clustering.py)
+# STEP 2 — CLUSTERING
 # =============================================================================
 logger.info(
     "=== STEP 2: Filtering, preprocessing, and Novae clustering ==="
 )
 
-# Extract the cell-level AnnData table
-adata = sdata["table"].copy()
+adata = sc.read_h5ad(
+    str(segmented_h5ad)
+)
 
 # Filter genes and cells
 logger.info(
@@ -239,6 +256,7 @@ logger.info(
     f"AnnData shape after filtering: {adata.shape}"
 )
 
+# %%
 # QC metrics
 vmax_pct = 99
 adata.var["mt"] = (
@@ -258,10 +276,9 @@ sc.pp.calculate_qc_metrics(
     percent_top=None,
 )
 
-# Plot n_counts embedding
-fig = sc.pl.embedding(
+# Plot n_counts
+fig = sc.pl.spatial(
     adata,
-    basis="spatial",
     color="n_counts",
     vmin=np.percentile(
         adata.obs["n_counts"], 1
@@ -269,21 +286,20 @@ fig = sc.pl.embedding(
     vmax=np.percentile(
         adata.obs["n_counts"], vmax_pct
     ),
-    size=8,
+    spot_size=10,
     show=False,
     return_fig=True,
 )
 fig.savefig(
-    f"{run_dir}/n_counts_embedding_{sample_id}.png",
+    f"{run_dir}/n_counts_{sample_id}.png",
     bbox_inches="tight",
     dpi=150,
 )
 plt.close(fig)
 
-# Plot mito embedding
-fig = sc.pl.embedding(
+# Plot mito percentage
+fig = sc.pl.spatial(
     adata,
-    basis="spatial",
     color="pct_counts_mt",
     vmin=np.percentile(
         adata.obs["pct_counts_mt"], 1
@@ -292,28 +308,28 @@ fig = sc.pl.embedding(
         adata.obs["pct_counts_mt"],
         vmax_pct,
     ),
-    size=8,
+    spot_size=10,
     show=False,
     return_fig=True,
 )
 fig.savefig(
-    f"{run_dir}/pct_counts_mt_embedding_{sample_id}.png",
+    f"{run_dir}/pct_counts_mt_{sample_id}.png",
     bbox_inches="tight",
     dpi=150,
 )
 plt.close(fig)
 
 # Filter high mito cells
-percentile_pct_mito = params[
-    "percentile_pct_mito"
-]
-pct_mito = params["pct_mito"]
-if percentile_pct_mito is not None:
+pct_to_remove = params["pct_mito"]
+if (
+    params["percentile_pct_mito"]
+    is not None
+):
     pct_to_remove = adata.obs[
         "pct_counts_mt"
-    ].quantile(percentile_pct_mito)
-else:
-    pct_to_remove = pct_mito
+    ].quantile(
+        params["percentile_pct_mito"]
+    )
 
 adata = adata[
     adata.obs["pct_counts_mt"]
@@ -323,35 +339,32 @@ logger.info(
     f"After mito filtering ({pct_to_remove}%): {adata.shape}"
 )
 
-# Plot mito embedding after filtering
-fig = sc.pl.embedding(
+# Plot mito after filtering
+fig = sc.pl.spatial(
     adata,
-    basis="spatial",
     color="pct_counts_mt",
-    size=8,
+    spot_size=10,
     show=False,
     return_fig=True,
 )
 fig.savefig(
-    f"{run_dir}/mt_embedding_after_filtering_{sample_id}.png",
+    f"{run_dir}/mt_after_filtering_{sample_id}.png",
     bbox_inches="tight",
     dpi=150,
 )
 plt.close(fig)
 
+# %%
 # Compute spatial neighbors
 logger.info(
     "Computing spatial neighbors."
 )
-spatial_radius = params["radius"]
 novae.spatial_neighbors(
     [adata],
-    radius=spatial_radius,
-    slide_key="sample_id",
+    radius=params["radius"],
     coord_type="generic",
 )
 
-# Plot connectivities
 novae.plot.connectivities([adata])
 plt.savefig(
     f"{run_dir}/connectivities.png",
@@ -360,6 +373,7 @@ plt.savefig(
 )
 plt.close()
 
+# %%
 # Novae preprocessing (normalize, log1p, HVGs)
 logger.info("Preprocessing with Novae")
 novae.utils.prepare_adatas([adata])
@@ -390,10 +404,13 @@ model.save_pretrained(
     str(run_dir / "model")
 )
 
+# %%
 logger.info(
     "Computing Novae representations..."
 )
-model.compute_representations([adata])
+model.compute_representations(
+    [adata], zero_shot=True
+)
 
 # Assign domains across a range of resolutions
 domain_min, domain_max = params[
@@ -406,24 +423,15 @@ for n_domains in range(
     model.assign_domains(
         [adata], level=n_domains
     )
-    model.batch_effect_correction(
-        [adata], obs_key=col
-    )
 
     adata.obsm[
         f"novae_latent_{n_domains}"
     ] = adata.obsm[
         "novae_latent"
     ].copy()
-    adata.obsm[
-        f"novae_latent_corrected_{n_domains}"
-    ] = adata.obsm[
-        "novae_latent_corrected"
-    ].copy()
 
     novae.plot.domains(
         [adata],
-        slide_name_key="sample_id",
         cell_size=8,
         show=False,
         obs_key=col,
@@ -451,6 +459,7 @@ for n_domains in range(
     )
     plt.close()
 
+# %%
 # Save clustered AnnData
 adata.write_h5ad(
     str(
@@ -464,52 +473,21 @@ logger.info(
 
 # %%
 # =============================================================================
-# STEP 3 — ANNOTATION (mirrors 03_THORA_ST_annotation.py)
+# STEP 3 — ANNOTATION
 # =============================================================================
 logger.info(
     "=== STEP 3: Cell type annotation with Enrichmap ==="
 )
 
-# Load marker genes from CSV files in data/markers/ and merge with config markers
-logger.info(
-    f"Loading marker CSVs from {MARKERS_DIR}"
-)
-for csv_file in MARKERS_DIR.glob(
-    "*.csv"
-):
-    df = pd.read_csv(csv_file)
-    cell_type = csv_file.stem.replace(
-        "_", " "
-    )
-    genes_from_csv = df["Name"].tolist()
-    # Merge CSV markers into config markers (config takes precedence, CSV adds extras)
-    config_key = csv_file.stem
-    if config_key in marker_genes:
-        existing = set(
-            marker_genes[config_key]
-        )
-        for g in genes_from_csv:
-            if g not in existing:
-                marker_genes[
-                    config_key
-                ].append(g)
-    else:
-        marker_genes[config_key] = (
-            genes_from_csv
-        )
-    logger.info(
-        f"  {config_key}: {marker_genes[config_key]}"
-    )
-
-# Use the chosen clustering resolution for annotation
-clustering_col = params[
-    "clustering_col"
-]
+clustering_col = "novae_domains_8"
 logger.info(
     f"Annotating using clustering column: {clustering_col}"
 )
+logger.info(
+    f"Marker genes: {marker_genes}"
+)
 
-# Ensure we use raw counts for enrichmap (lognorm layer was saved during preprocessing)
+# Ensure we use lognorm counts for enrichmap
 if "lognorm_counts" in adata.layers:
     adata.X = adata.layers[
         "lognorm_counts"
@@ -530,7 +508,7 @@ marker_genes_filtered = {
     if len(genes) > 0
 }
 logger.info(
-    f"Marker genes after filtering to var_names: { {k: len(v) for k, v in marker_genes_filtered.items()} }"
+    f"Marker genes after filtering: { {k: len(v) for k, v in marker_genes_filtered.items()} }"
 )
 
 # Run Enrichmap scoring
@@ -542,10 +520,10 @@ em.tl.score(
     gene_set=marker_genes_filtered,
     smoothing=True,
     correct_spatial_covariates=True,
-    batch_key="sample_id",
 )
 
-# Identify top cell type per domain
+# %%
+# Rank cell type scores per domain using decoupler (1-vs-rest Wilcoxon)
 score_cols = [
     col
     for col in adata.obs.columns
@@ -555,7 +533,108 @@ logger.info(
     f"Score columns: {score_cols}"
 )
 
-# Assign cell type as the highest scoring marker set per cell
+score_matrix = adata.obs[
+    score_cols
+].values
+score_adata = AnnData(
+    X=score_matrix,
+    obs=adata.obs[
+        [clustering_col]
+    ].copy(),
+)
+score_adata.var_names = [
+    col.replace("_score", "")
+    for col in score_cols
+]
+
+ranking_df = dc.tl.rankby_group(
+    score_adata,
+    groupby=clustering_col,
+    reference="rest",
+    method="wilcoxon",
+)
+
+# %%
+ranking_df = ranking_df.sort_values(
+    by=["group", "meanchange"],
+    ascending=[True, False],
+)
+logger.info(
+    f"Ranking shape: {ranking_df.shape}"
+)
+ranking_df.to_csv(
+    str(
+        run_dir
+        / f"enrichment_ranking_{clustering_col}.csv"
+    ),
+    index=False,
+)
+
+# %%
+# Gap-based annotation: for each domain, find the biggest drop
+# in meanchange among significant cell types
+enrichmap_gap_annotations = {}
+elbow_data = {}
+
+for domain in ranking_df[
+    "group"
+].unique():
+    domain_data = ranking_df.loc[
+        ranking_df["group"] == domain
+    ].copy()
+
+    # Filter to significant, positively enriched
+    domain_data = domain_data.loc[
+        (domain_data["meanchange"] > 0)
+        & (domain_data["padj"] < 0.05)
+    ]
+
+    if len(domain_data) == 0:
+        enrichmap_gap_annotations[
+            domain
+        ] = "Unknown"
+        continue
+
+    if len(domain_data) == 1:
+        enrichmap_gap_annotations[
+            domain
+        ] = domain_data["name"].iloc[0]
+        elbow_data[domain] = domain_data
+        continue
+
+    elbow_data[domain] = domain_data
+
+    sorted_mc = domain_data[
+        "meanchange"
+    ].values
+    gaps = (
+        sorted_mc[:-1] - sorted_mc[1:]
+    )
+    biggest_gap_idx = int(
+        np.argmax(gaps)
+    )
+
+    selected = (
+        domain_data["name"]
+        .iloc[: biggest_gap_idx + 1]
+        .tolist()
+    )
+    enrichmap_gap_annotations[
+        domain
+    ] = "/".join(selected)
+
+logger.info(
+    f"Domain -> cell type mapping:\n{enrichmap_gap_annotations}"
+)
+
+# Assign domain-level cell type
+adata.obs["cell_type_domain"] = (
+    adata.obs[clustering_col].map(
+        enrichmap_gap_annotations
+    )
+)
+
+# Per-cell high granularity: argmax over scores
 score_df = adata.obs[score_cols].copy()
 score_df.columns = [
     col.replace("_score", "")
@@ -565,21 +644,164 @@ adata.obs["cell_type_enrichmap"] = (
     score_df.idxmax(axis=1)
 )
 
-# Per-domain majority vote for cleaner labels
-domain_ct = adata.obs.groupby(
-    clustering_col
-)["cell_type_enrichmap"].agg(
-    lambda x: x.value_counts().index[0]
-)
-adata.obs["cell_type_domain"] = (
-    adata.obs[clustering_col].map(
-        domain_ct
-    )
-)
-
 logger.info(
     f"Cell type distribution:\n{adata.obs['cell_type_domain'].value_counts()}"
 )
+
+# %%
+# Elbow plot: meanchange vs ranked cell types per domain
+plottable_domains = [
+    d
+    for d in elbow_data
+    if len(elbow_data[d]) > 0
+]
+n_domains_plot = len(plottable_domains)
+n_cols_plot = min(4, n_domains_plot)
+n_rows_plot = int(
+    np.ceil(
+        n_domains_plot / n_cols_plot
+    )
+)
+
+fig_elbow, axes_elbow = plt.subplots(
+    n_rows_plot,
+    n_cols_plot,
+    figsize=(
+        5 * n_cols_plot,
+        4 * n_rows_plot,
+    ),
+)
+axes_flat = np.array(
+    axes_elbow
+).flatten()
+
+for ax_idx, domain in enumerate(
+    plottable_domains
+):
+    ax = axes_flat[ax_idx]
+    domain_data = elbow_data[domain]
+    mc_vals = domain_data[
+        "meanchange"
+    ].values
+    ct_names = domain_data[
+        "name"
+    ].values
+    x_pos = np.arange(len(mc_vals))
+
+    selected_names = set(
+        enrichmap_gap_annotations[
+            domain
+        ].split("/")
+    )
+
+    ax.plot(
+        x_pos,
+        mc_vals,
+        color="gray",
+        lw=1.5,
+        zorder=2,
+    )
+
+    for i, (xp, mc, name) in enumerate(
+        zip(x_pos, mc_vals, ct_names)
+    ):
+        if name in selected_names:
+            color = "steelblue"
+            ec = "black"
+        else:
+            color = "silver"
+            ec = "gray"
+        ax.scatter(
+            xp,
+            mc,
+            color=color,
+            s=60,
+            zorder=4,
+            edgecolors=ec,
+            linewidths=0.5,
+        )
+
+    if len(mc_vals) > 1:
+        gaps = (
+            mc_vals[:-1] - mc_vals[1:]
+        )
+        gap_idx = int(np.argmax(gaps))
+        gap_x = gap_idx + 0.5
+        gap_val = gaps[gap_idx]
+        ax.axvline(
+            gap_x,
+            color="red",
+            ls="--",
+            lw=1,
+            alpha=0.8,
+            label=f"gap = {gap_val:.3f}",
+        )
+        ax.axvspan(
+            -0.5,
+            gap_x,
+            alpha=0.08,
+            color="steelblue",
+        )
+        y_top = mc_vals[gap_idx]
+        y_bot = mc_vals[gap_idx + 1]
+        bracket_x = gap_x + 0.3
+        ax.annotate(
+            "",
+            xy=(bracket_x, y_bot),
+            xytext=(bracket_x, y_top),
+            arrowprops=dict(
+                arrowstyle="<->",
+                color="red",
+                lw=1.2,
+            ),
+        )
+        ax.text(
+            bracket_x + 0.15,
+            (y_top + y_bot) / 2,
+            f"{gap_val:.3f}",
+            fontsize=6,
+            color="red",
+            va="center",
+        )
+
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(
+        ct_names,
+        rotation=60,
+        ha="right",
+        fontsize=5,
+    )
+    ax.set_ylabel(
+        "meanchange", fontsize=7
+    )
+    ax.set_title(
+        f"Domain {domain}", fontsize=8
+    )
+    ax.legend(
+        fontsize=5, loc="upper right"
+    )
+    ax.tick_params(labelsize=6)
+
+for ax_idx in range(
+    n_domains_plot, len(axes_flat)
+):
+    axes_flat[ax_idx].axis("off")
+
+fig_elbow.suptitle(
+    f"Gap-based elbow — {clustering_col}",
+    fontsize=11,
+)
+plt.tight_layout()
+plt.savefig(
+    str(
+        run_dir
+        / f"elbow_plot_{clustering_col}.png"
+    ),
+    dpi=400,
+    bbox_inches="tight",
+)
+plt.close()
+logger.info("Saved elbow plot")
 
 # %%
 # =============================================================================
@@ -587,14 +809,30 @@ logger.info(
 # =============================================================================
 logger.info("=== Generating plots ===")
 
-# Spatial embedding colored by cell type
-sc.pl.embedding(
+cell_type_palette = {
+    "Tumor": "#E64B35",
+    "Fibroblasts": "#4DBBD5",
+    "Macrophages": "#3C5488",
+    "Neutrophils": "#F39B7F",
+    "Goblet_cells": "#00599F",
+    "Macrophages/Neutrophils": "#FFD700",
+    "Unknown": "#B09C85",
+}
+
+sc.pl.spatial(
     adata,
-    basis="spatial",
     color="cell_type_domain",
-    size=8,
+    spot_size=9,
     show=False,
     title=f"{sample_name} - Cell Types",
+    palette=[
+        cell_type_palette.get(
+            ct, "#999999"
+        )
+        for ct in adata.obs[
+            "cell_type_domain"
+        ].cat.categories
+    ],
 )
 plt.savefig(
     str(
@@ -606,6 +844,29 @@ plt.savefig(
 )
 plt.close()
 
+# %%
+
+adata = sc.read_h5ad(
+    r"C:\Users\rafae\Projects\segmentation-and-annotation\data\spatial\processed\crc_tutorial_17032026_1255\Visium_HD_Human_Colon_Cancer_annotated.h5ad"
+)
+sc.pl.spatial(
+    adata,
+    color="novae_domains_8",
+    spot_size=9,
+    show=False,
+    title="Novae Domains (8)",
+)
+plt.savefig(
+    str(
+        run_dir
+        / "novaoe_domains_spatial.png"
+    ),
+    dpi=600,
+    bbox_inches="tight",
+)
+plt.close()
+
+# %%
 # Enrichmap score heatmap per domain
 score_by_domain = adata.obs.groupby(
     clustering_col
@@ -681,3 +942,353 @@ adata.write_h5ad(
 logger.info(
     f"Done! All outputs saved to {run_dir}"
 )
+
+
+# %%
+adata = sc.read_h5ad(
+    r"C:\Users\rafae\Projects\segmentation-and-annotation\data\spatial\processed\crc_tutorial_17032026_1255\Visium_HD_Human_Colon_Cancer_annotated.h5ad"
+)
+
+# %%
+
+
+# Helper: map point coordinates from adata.obsm['spatial'] into an image
+# coordinate system, create a PointsModel, attach it to `sdata_sub`, and
+# optionally plot it. Returns diagnostics and the mapped DataFrame.
+def map_and_plot_points(
+    adata,
+    sdata_sub,
+    sample_id,
+    color_col="novae_domains_8",
+    points_key="segmented_points",
+    size=6,
+    alpha=0.7,
+    transformations=None,
+    show_plot=True,
+):
+    """Map local adata spatial coords into the sample image coordinate
+    system, create a PointsModel and attach to sdata_sub, and plot.
+
+    Returns a dict with diagnostics and the mapped DataFrame.
+    """
+    import numpy as _np
+    import pandas as _pd
+    from spatialdata.models import (
+        PointsModel as _PointsModel,
+        TableModel as _TableModel,
+    )
+    from spatialdata.transformations import (
+        Identity as _Identity,
+    )
+
+    # 1. Prepare AnnData table metadata
+    adata.obs["region"] = (
+        "segmented_points"
+    )
+    adata.obs["region"] = adata.obs[
+        "region"
+    ].astype("category")
+    adata.obs["instance_id"] = (
+        adata.obs_names
+    )
+
+    _ = _TableModel.parse(
+        adata,
+        region="segmented_points",
+        region_key="region",
+        instance_key="instance_id",
+        overwrite_metadata=True,
+    )
+    sdata_sub.tables[
+        "segmented_table"
+    ] = adata
+
+    # 2. Build DataFrame from local spatial coordinates
+    coords = _np.asarray(
+        adata.obsm["spatial"]
+    )
+    df_local = _pd.DataFrame(
+        coords,
+        columns=["x", "y"],
+        index=adata.obs_names,
+    )
+
+    # 3. Map local coordinates into the sample image coordinate system
+    bbox = sd.get_extent(
+        sdata_sub,
+        elements=[
+            f"{sample_id}_full_image"
+        ],
+        coordinate_system=sample_id,
+    )
+    bx0 = float(bbox["x"][0])
+    bx1 = float(bbox["x"][1])
+    by0 = float(bbox["y"][0])
+    by1 = float(bbox["y"][1])
+
+    local_x_min = float(
+        df_local["x"].min()
+    )
+    local_x_max = float(
+        df_local["x"].max()
+    )
+    local_y_min = float(
+        df_local["y"].min()
+    )
+    local_y_max = float(
+        df_local["y"].max()
+    )
+
+    local_x_span = (
+        local_x_max - local_x_min
+    )
+    local_y_span = (
+        local_y_max - local_y_min
+    )
+    bbox_x_span = bx1 - bx0
+    bbox_y_span = by1 - by0
+
+    scale_x = (
+        bbox_x_span / local_x_span
+        if local_x_span > 0
+        else 1.0
+    )
+    scale_y = (
+        bbox_y_span / local_y_span
+        if local_y_span > 0
+        else 1.0
+    )
+
+    df_mapped = _pd.DataFrame(
+        index=df_local.index
+    )
+    df_mapped["x"] = (
+        bx0
+        + (
+            df_local["x"].astype(float)
+            - local_x_min
+        )
+        * scale_x
+    )
+    df_mapped["y"] = (
+        by0
+        + (
+            df_local["y"].astype(float)
+            - local_y_min
+        )
+        * scale_y
+    )
+
+    def _frac_inside(dframe):
+        in_bbox = (
+            (dframe["x"] >= bx0)
+            & (dframe["x"] <= bx1)
+            & (dframe["y"] >= by0)
+            & (dframe["y"] <= by1)
+        )
+        return in_bbox.sum() / len(
+            dframe
+        )
+
+    frac_mapped = _frac_inside(
+        df_mapped
+    )
+    # y-flip variant
+    df_mapped_flip = df_mapped.copy()
+    df_mapped_flip["y"] = by1 - (
+        df_mapped["y"] - by0
+    )
+    frac_flip = _frac_inside(
+        df_mapped_flip
+    )
+
+    used_flip = False
+    if frac_flip > frac_mapped:
+        df = df_mapped_flip
+        used_flip = True
+    else:
+        df = df_mapped
+
+    # 4. Diagnostic: compare to segmentation centroids if available
+    centroid_stats = None
+    try:
+        shape_keys = list(
+            sdata_sub.shapes.keys()
+        )
+        candidate_shape_keys = [
+            k
+            for k in shape_keys
+            if "proseg_boundaries" in k
+            or "stardist_boundaries"
+            in k
+        ]
+        if (
+            len(candidate_shape_keys)
+            > 0
+        ):
+            shape_key = (
+                candidate_shape_keys[0]
+            )
+            shapes_gdf = (
+                sdata_sub.shapes[
+                    shape_key
+                ]
+            )
+            centroids = shapes_gdf.geometry.centroid
+            centroids_xy = _np.vstack(
+                [
+                    centroids.x.values,
+                    centroids.y.values,
+                ]
+            ).T
+            try:
+                from scipy.spatial import (
+                    cKDTree as KDTree,
+                )
+
+                tree = KDTree(
+                    centroids_xy
+                )
+                dists, _ = tree.query(
+                    df[
+                        ["x", "y"]
+                    ].values,
+                    k=1,
+                )
+            except Exception:
+                pts = df[
+                    ["x", "y"]
+                ].values
+                dists = _np.empty(
+                    len(pts),
+                    dtype=float,
+                )
+                for i in range(
+                    len(pts)
+                ):
+                    dx = (
+                        centroids_xy[
+                            :, 0
+                        ]
+                        - pts[i, 0]
+                    )
+                    dy = (
+                        centroids_xy[
+                            :, 1
+                        ]
+                        - pts[i, 1]
+                    )
+                    dists[i] = _np.sqrt(
+                        (
+                            dx * dx
+                            + dy * dy
+                        ).min()
+                    )
+            centroid_stats = {
+                "median": float(
+                    _np.median(dists)
+                ),
+                "mean": float(
+                    _np.mean(dists)
+                ),
+                "max": float(
+                    _np.max(dists)
+                ),
+            }
+    except Exception:
+        centroid_stats = None
+
+    # 5. Attach color column and sanitize
+    if (
+        color_col
+        not in adata.obs.columns
+    ):
+        raise KeyError(
+            f"color_col '{color_col}' not found in adata.obs"
+        )
+    s = adata.obs[color_col].reindex(
+        df.index
+    )
+    s = (
+        s.astype(object)
+        .fillna("Unknown")
+        .astype(str)
+    )
+    df[color_col] = s.values
+
+    # 6. Create PointsModel and attach
+    _transformations = (
+        transformations
+        if transformations is not None
+        else {sample_id: _Identity()}
+    )
+    points = _PointsModel.parse(
+        df,
+        coordinates={
+            "x": "x",
+            "y": "y",
+        },
+        transformations=_transformations,
+    )
+    sdata_sub.points[points_key] = (
+        points
+    )
+
+    # 7. Plot
+    if show_plot:
+        (
+            sdata_sub.pl.render_images(
+                f"{sample_id}_full_image"
+            )
+            .pl.render_points(
+                points_key,
+                color=color_col,
+                size=size,
+                alpha=alpha,
+                method="matplotlib",
+            )
+            .pl.show(
+                coordinate_systems=sample_id,
+                figsize=(12, 12),
+                title=f"{color_col} on H&E",
+            )
+        )
+
+    return {
+        "scale_x": scale_x,
+        "scale_y": scale_y,
+        "frac_in_bbox": float(
+            frac_mapped
+        ),
+        "frac_in_bbox_flip": float(
+            frac_flip
+        ),
+        "used_flip": used_flip,
+        "centroid_stats": centroid_stats,
+        "df": df,
+    }
+
+
+# %%
+# Call the helper to map points and plot (default color column is novae_domains_8)
+map_and_plot_points(
+    adata,
+    sdata_sub,
+    sample_id,
+    color_col="novae_domains_8",
+    points_key="segmented_points",
+    size=8,
+    alpha=0.7,
+)
+# %%
+map_and_plot_points(
+    adata,
+    sdata_sub,
+    sample_id,
+    color_col="cell_type_domain",
+    points_key="segmented_points",
+    size=8,
+    alpha=0.7,
+)
+
+# %%
