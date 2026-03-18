@@ -5,3 +5,7 @@ data/Interactive - data.py.ipynb
 scripts/test.zarr/zarr.json
 scripts/test.zarr/images/zarr.json
 scripts/test.zarr/images/Visium_HD_Human_Colon_Cancer_full_image/zarr.json
+data/data_annotated.ipynb
+data/processed/crc_tutorial_17032026_1134/Visium_HD_Human_Colon_Cancer_clustered.h5ad
+data/processed/crc_tutorial_17032026_1134/model/model.safetensors
+data/processed/crc_tutorial_17032026_1255/Visium_HD_Human_Colon_Cancer_annotated.h5ad
