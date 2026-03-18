@@ -394,6 +394,7 @@ logger.info(
 model = novae.Novae.from_pretrained(
     params["novae_model"]
 )
+# NOTE: train our own model. See more on Novae page (put link)
 model.fine_tune(
     [adata],
     max_epochs=params[
@@ -408,6 +409,7 @@ model.save_pretrained(
 logger.info(
     "Computing Novae representations..."
 )
+# Inference based on zero_shot
 model.compute_representations(
     [adata], zero_shot=True
 )
