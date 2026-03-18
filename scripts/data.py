@@ -475,6 +475,10 @@ logger.info(
 # =============================================================================
 # STEP 3 — ANNOTATION
 # =============================================================================
+
+adata = sc.read_h5ad(
+    r"C:\Users\rafae\Projects\segmentation-and-annotation\data\spatial\processed\crc_tutorial_17032026_1134\Visium_HD_Human_Colon_Cancer_clustered.h5ad"
+)
 logger.info(
     "=== STEP 3: Cell type annotation with Enrichmap ==="
 )
@@ -522,6 +526,31 @@ em.tl.score(
     correct_spatial_covariates=True,
 )
 
+# %% We can do this or use em.pl.spatial_enrichmap()
+import matplotlib.pyplot as plt
+import numpy as np
+
+coords = adata.obsm["spatial"]
+scores = adata.obs["Neutrophils_score"]
+
+fig, ax = plt.subplots(figsize=(10, 10))
+scatter = ax.scatter(
+    coords[:, 0],
+    coords[:, 1],
+    c=scores,
+    cmap="seismic",
+    s=3,
+    vmin=-scores.abs().max(),
+    vmax=scores.abs().max(),
+)
+ax.set_aspect("equal")
+ax.invert_yaxis()
+ax.axis("off")
+ax.set_title("Tumor")
+plt.colorbar(scatter, ax=ax, shrink=0.5)
+plt.show()
+
+
 # %%
 # Rank cell type scores per domain using decoupler (1-vs-rest Wilcoxon)
 score_cols = [
@@ -547,6 +576,7 @@ score_adata.var_names = [
     for col in score_cols
 ]
 
+# NOTE: Mention that we can either do 1 vs rest test using decoupler or scanpy or other testing method, or simply do an idxmax on the enrichmap scores and assign that given segmented cell to the given cell type. In this tutorial, I am showing how to do the rankby_group method using dc. The reason is that we can then use an elbow gap method later on to find spots that may be capturing more heterogeneity (more than 1 cell type) and attribute to 1 or more cell types for a given segmented cell.
 ranking_df = dc.tl.rankby_group(
     score_adata,
     groupby=clustering_col,
