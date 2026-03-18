@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "WebFetch(domain:www.10xgenomics.com)",
-      "WebSearch",
-      "Bash(C:/venv/segmentation/Scripts/pip.exe install:*)"
-    ]
-  }
-}
