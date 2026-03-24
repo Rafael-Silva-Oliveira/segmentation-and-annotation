@@ -9,3 +9,11 @@ data/data_annotated.ipynb
 data/processed/crc_tutorial_17032026_1134/Visium_HD_Human_Colon_Cancer_clustered.h5ad
 data/processed/crc_tutorial_17032026_1134/model/model.safetensors
 data/processed/crc_tutorial_17032026_1255/Visium_HD_Human_Colon_Cancer_annotated.h5ad
+scripts/.tests/01_THORA_ST_segmentation.py
+scripts/.tests/02_THORA_ST_clustering.py
+scripts/.tests/03_THORA_ST_annotation.py
+scripts/.tests/annotation.py
+scripts/.tests/filtering.py
+scripts/.tests/plotting.py
+scripts/.tests/preprocessing.py
+scripts/spatial_A1-GC-AHZT1_cell_type_enrichmap_novae_domains_25.png
