@@ -1556,6 +1556,28 @@ model = celltypist.train(
 model_path = "celltypist_model.pkl"
 model.write(model_path)
 
+
+# %%
+
+# Load pre-built CellTypist model for Human Colorectal Cancer
+celltypist.models.download_models(
+    model="Human_Colorectal_Cancer.pkl",
+    force_update=False,
+)
+model = celltypist.models.Model.load(
+    model="Human_Colorectal_Cancer.pkl"
+)
+
+
+# %%
+
+col = adata.obs["novae_domains_8"]
+adata.obs["novae_domains_8"] = (
+    col.cat.add_categories("Unassigned")
+    .fillna("Unassigned")
+    .astype(str)
+)
+
 predictions = celltypist.annotate(
     adata,
     model=model,
@@ -1581,7 +1603,7 @@ adata.obs[f"conf_score_celltypist"] = (
 sc.pl.spatial(
     adata,
     color="cell_type_celltypist",
-    spot_size=33,
+    spot_size=9,
     show=False,
 )
 plt.savefig(
