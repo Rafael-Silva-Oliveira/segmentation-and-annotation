@@ -10,3 +10,8 @@ data/processed/crc_tutorial_17032026_1134/Visium_HD_Human_Colon_Cancer_clustered
 data/processed/crc_tutorial_17032026_1134/model/model.safetensors
 data/processed/crc_tutorial_17032026_1255/Visium_HD_Human_Colon_Cancer_annotated.h5ad
 
+scripts/GSE200997/GSE200997_CRC_scRNA_reference.h5ad
+scripts/GSE200997/GSE200997_GEO_processed_CRC_10X_cell_annotation.csv.gz
+scripts/GSE200997/GSE200997_GEO_processed_CRC_10X_raw_UMI_count_matrix.csv.gz
+scripts/GSE200997_series_matrix.txt.gz
+.claude/settings.local.json

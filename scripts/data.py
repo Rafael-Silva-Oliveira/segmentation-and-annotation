@@ -127,7 +127,7 @@ sdata_sub = sd.bounding_box_query(
     filter_table=True,
 )
 
-sdata_sub.write("test.zarr")  # save it
+# sdata_sub.write("test.zarr")  # save it
 
 # %%
 # Plot the cropped region
@@ -879,7 +879,7 @@ plt.close()
 # %%
 
 adata = sc.read_h5ad(
-    r"C:\Users\rafae\Projects\segmentation-and-annotation\data\spatial\processed\crc_tutorial_17032026_1255\Visium_HD_Human_Colon_Cancer_annotated.h5ad"
+    r"C:\Users\rafae\Projects\segmentation-and-annotation\data\processed\crc_tutorial_17032026_1255\Visium_HD_Human_Colon_Cancer_annotated.h5ad"
 )
 sc.pl.spatial(
     adata,
@@ -1324,3 +1324,356 @@ map_and_plot_points(
 )
 
 # %%
+# =============================================================================
+# ADDITIONAL STEP: Annotation using reference scRNA dataset with RCTD-py and FlashDeconv
+# Reference: GSE200997 - Human CRC scRNA-seq (Lee et al.)
+# =============================================================================
+
+
+# %%
+# Download processed scRNA-seq reference from GEO (GSE200997)
+import os
+import urllib.request
+
+import scipy.sparse as sp
+
+os.makedirs("GSE200997", exist_ok=True)
+
+base_url = "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE200nnn/GSE200997/suppl"
+
+counts_file = "GSE200997_GEO_processed_CRC_10X_raw_UMI_count_matrix.csv.gz"
+annot_file = "GSE200997_GEO_processed_CRC_10X_cell_annotation.csv.gz"
+
+for fname in [counts_file, annot_file]:
+    out_path = f"GSE200997/{fname}"
+    if not os.path.exists(out_path):
+        url = f"{base_url}/{fname}"
+        print(f"Downloading: {fname}")
+        urllib.request.urlretrieve(
+            url, out_path
+        )
+        print(f"  Saved to: {out_path}")
+
+# %%
+# Read the count matrix and annotations
+print(
+    "Reading count matrix (this may take a moment)..."
+)
+counts_df = pd.read_csv(
+    f"GSE200997/{counts_file}",
+    index_col=0,
+)
+print(
+    f"  Count matrix shape: {counts_df.shape}"
+)
+
+annot_df = pd.read_csv(
+    f"GSE200997/{annot_file}",
+    index_col=0,
+)
+print(
+    f"  Annotation shape: {annot_df.shape}"
+)
+print(
+    f"  Annotation columns: {annot_df.columns.tolist()}"
+)
+
+# %%
+# Build the reference AnnData
+# The count matrix is (genes x cells), so we transpose to (cells x genes)
+if (
+    counts_df.shape[0]
+    < counts_df.shape[1]
+):
+    # Rows are genes, columns are cells -> transpose
+    counts_df = counts_df.T
+    print(
+        "Transposed count matrix to (cells x genes)"
+    )
+
+# Align cells between counts and annotations
+common_cells = (
+    counts_df.index.intersection(
+        annot_df.index
+    )
+)
+print(
+    f"Cells in counts: {counts_df.shape[0]}, "
+    f"in annotations: {annot_df.shape[0]}, "
+    f"in common: {len(common_cells)}"
+)
+
+counts_df = counts_df.loc[common_cells]
+annot_df = annot_df.loc[common_cells]
+
+# Create AnnData with sparse count matrix
+adata_ref = AnnData(
+    X=sp.csr_matrix(counts_df.values),
+    obs=annot_df,
+)
+adata_ref.var_names = (
+    counts_df.columns.astype(
+        str
+    ).tolist()
+)
+adata_ref.obs_names = (
+    counts_df.index.astype(str).tolist()
+)
+
+print(
+    f"Reference AnnData: {adata_ref.shape}"
+)
+print(
+    f"  obs columns: {adata_ref.obs.columns.tolist()}"
+)
+
+# %%
+ct_col = "Condition"
+print(
+    f"Cell types ({adata_ref.obs[ct_col].nunique()}):"
+)
+print(
+    adata_ref.obs[ct_col].value_counts()
+)
+
+# %%
+# Standardize: rename to 'cell_type' for RCTD-py and FlashDeconv compatibility
+adata_ref.obs["cell_type"] = (
+    adata_ref.obs[ct_col]
+    .astype(str)
+    .astype("category")
+)
+
+# Remove Unknown/Unassigned cells (FlashDeconv warns these absorb proportions)
+mask_unknown = (
+    adata_ref.obs["cell_type"]
+    .str.lower()
+    .isin(
+        [
+            "unknown",
+            "unassigned",
+            "nan",
+            "none",
+            "",
+        ]
+    )
+)
+if mask_unknown.any():
+    print(
+        f"Removing {mask_unknown.sum()} unknown/unassigned cells"
+    )
+    adata_ref = adata_ref[
+        ~mask_unknown
+    ].copy()
+
+# Basic QC: filter cells with very low counts
+sc.pp.calculate_qc_metrics(
+    adata_ref, inplace=True
+)
+min_counts = 100
+adata_ref = adata_ref[
+    adata_ref.obs["total_counts"]
+    >= min_counts
+].copy()
+print(
+    f"After QC (min {min_counts} UMI): {adata_ref.shape}"
+)
+
+# %%
+# Save the reference AnnData
+ref_path = "GSE200997/GSE200997_CRC_scRNA_reference.h5ad"
+adata_ref.write_h5ad(ref_path)
+print(f"Reference saved to: {ref_path}")
+print(f"  Shape: {adata_ref.shape}")
+print(
+    f"  Cell types: {adata_ref.obs['cell_type'].nunique()}"
+)
+print(adata_ref)
+
+# %%
+import flashdeconv as fd
+
+# Load the 008 um data
+adata_st_subset = sdata_sub.tables[
+    "square_008um"
+].copy()
+# Filter by UMI (same range as rctd-py: 100–20M)
+umi = adata_st_subset.X.sum(axis=1).A1
+
+umi_mask = (umi >= 100) & (
+    umi <= 20_000_000
+)
+adata_st_filtered = adata_st_subset[
+    umi_mask
+].copy()
+print(
+    f"UMI filter: kept {umi_mask.sum()}/{len(umi_mask)} pixels"
+)
+# %%
+
+# Deconvolve -https://github.com/cafferychen777/flashdeconv
+fd.tl.deconvolve(
+    adata_st_filtered,
+    adata_ref,
+    cell_type_key=ct_col,
+)
+
+sc.pl.spatial(
+    adata_st_filtered,
+    color="flashdeconv_dominant",
+    spot_size=33,
+    show=False,
+)
+plt.savefig(
+    "flashdeconv_dominant.png",
+    dpi=2000,
+    bbox_inches="tight",
+)
+plt.close()
+# %%
+# https://github.com/p-gueguen/rctd-py
+# Disable torch.compile/inductor — requires MSVC (cl) which is not available on this system
+import torch._dynamo
+
+torch._dynamo.config.suppress_errors = (
+    True
+)
+torch._dynamo.disable()
+
+from rctd import Reference, run_rctd
+
+reference = Reference(
+    adata_ref,
+    cell_type_col=ct_col,
+)
+
+# Run RCTD — handles normalization, sigma estimation, and deconvolution
+result = run_rctd(
+    adata_st_filtered,
+    reference,
+    mode="full",  # https://p-gueguen.github.io/rctd-py/tutorial.html # doublet or full
+)
+
+# %%
+
+# Store per-cell-type weights directly (results align 1:1 with adata_st_filtered)
+for i, ct in enumerate(
+    result.cell_type_names
+):
+    adata_st_filtered.obs[
+        f"rctd_{ct}"
+    ] = result.weights[:, i]
+
+# Dominant cell type per spot
+adata_st_filtered.obs[
+    "rctd_dominant"
+] = pd.Categorical(
+    [
+        result.cell_type_names[i]
+        for i in result.weights.argmax(
+            axis=1
+        )
+    ]
+)
+
+# %%
+sc.pl.spatial(
+    adata_st_filtered,
+    color="rctd_dominant",
+    spot_size=33,
+    show=False,
+)
+plt.savefig(
+    "rctd_dominant.png",x
+    dpi=2000,
+    bbox_inches="tight",
+)
+plt.close()
+
+# %%
+# Celltypist
+
+import celltypist
+adata = sc.read_h5ad(
+    r"C:\Users\rafae\Projects\segmentation-and-annotation\data\processed\crc_tutorial_17032026_1255\Visium_HD_Human_Colon_Cancer_annotated.h5ad"
+)
+
+# Subset genes from our segmented cell dataset adata object and our ref, adata_ref
+# Subset to shared genes
+common_genes = adata.var_names.intersection(adata_ref.var_names)
+adata = adata[:, common_genes].copy()
+adata_ref = adata_ref[:, common_genes].copy()
+
+
+# %%
+adata.X = (
+    adata.layers[
+        "counts"
+    ].copy()
+)
+sc.pp.normalize_total(
+    adata,
+    target_sum=1e4,
+)
+sc.pp.log1p(adata)
+
+adata.layers[
+    "lognorm_counts_celltypist"
+] = adata.X.copy()
+
+# %%
+# Now do the same log-normalization for the adata_ref
+sc.pp.normalize_total(
+    adata_ref,
+    target_sum=1e4,
+)
+sc.pp.log1p(adata_ref)
+
+adata_ref.layers[
+    "lognorm_counts_celltypist"
+] = adata_ref.X.copy()
+
+
+# %%
+model = celltypist.train(
+    adata_ref,
+    labels=ct_col,
+    n_jobs=1,
+    feature_selection=True,
+)
+
+# %%
+model_path = ("celltypist_model.pkl")
+model.write(model_path)
+
+predictions = celltypist.annotate(
+    adata,
+    model=model,
+    majority_voting=True,
+    over_clustering="novae_domains_8"
+)
+preds_adata = (
+    predictions.to_adata()
+)
+
+adata.obs[
+    f"cell_type_celltypist"
+] = preds_adata.obs[
+    "majority_voting"
+].values
+adata.obs[
+    f"cell_type_celltypist_per_cell"
+] = preds_adata.obs[
+    "predicted_labels"
+].values
+adata.obs[
+    f"conf_score_celltypist"
+] = preds_adata.obs[
+    "conf_score"
+].values
+
+sc.pl.spatial(
+    adata,
+    color="cell_type_celltypist",
+    spot_size=9,
+)
