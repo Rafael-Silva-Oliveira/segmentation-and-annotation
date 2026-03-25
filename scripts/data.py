@@ -1328,175 +1328,68 @@ map_and_plot_points(
 # ADDITIONAL STEP: Annotation using reference scRNA dataset with RCTD-py and FlashDeconv
 # Reference: GSE200997 - Human CRC scRNA-seq (Lee et al.)
 # =============================================================================
+import urllib.request, os
 
+ref_url = "https://datasets.cellxgene.cziscience.com/0ca03016-58ec-4d4e-86d9-22dda860bc8c.h5ad"
+ref_path = "pelka_crc_all_cells.h5ad"
 
-# %%
-# Download processed scRNA-seq reference from GEO (GSE200997)
-import os
-import urllib.request
-
-import scipy.sparse as sp
-
-os.makedirs("GSE200997", exist_ok=True)
-
-base_url = "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE200nnn/GSE200997/suppl"
-
-counts_file = "GSE200997_GEO_processed_CRC_10X_raw_UMI_count_matrix.csv.gz"
-annot_file = "GSE200997_GEO_processed_CRC_10X_cell_annotation.csv.gz"
-
-for fname in [counts_file, annot_file]:
-    out_path = f"GSE200997/{fname}"
-    if not os.path.exists(out_path):
-        url = f"{base_url}/{fname}"
-        print(f"Downloading: {fname}")
-        urllib.request.urlretrieve(
-            url, out_path
-        )
-        print(f"  Saved to: {out_path}")
-
-# %%
-# Read the count matrix and annotations
-print(
-    "Reading count matrix (this may take a moment)..."
-)
-counts_df = pd.read_csv(
-    f"GSE200997/{counts_file}",
-    index_col=0,
-)
-print(
-    f"  Count matrix shape: {counts_df.shape}"
-)
-
-annot_df = pd.read_csv(
-    f"GSE200997/{annot_file}",
-    index_col=0,
-)
-print(
-    f"  Annotation shape: {annot_df.shape}"
-)
-print(
-    f"  Annotation columns: {annot_df.columns.tolist()}"
-)
-
-# %%
-# Build the reference AnnData
-# The count matrix is (genes x cells), so we transpose to (cells x genes)
-if (
-    counts_df.shape[0]
-    < counts_df.shape[1]
-):
-    # Rows are genes, columns are cells -> transpose
-    counts_df = counts_df.T
+if not os.path.exists(ref_path):
     print(
-        "Transposed count matrix to (cells x genes)"
+        "Downloading Pelka et al. CRC reference (~370k cells)..."
+    )
+    urllib.request.urlretrieve(
+        ref_url, ref_path
     )
 
-# Align cells between counts and annotations
-common_cells = (
-    counts_df.index.intersection(
-        annot_df.index
-    )
-)
-print(
-    f"Cells in counts: {counts_df.shape[0]}, "
-    f"in annotations: {annot_df.shape[0]}, "
-    f"in common: {len(common_cells)}"
-)
+adata_ref = sc.read_h5ad(ref_path)
+ct_col = "ClusterMidway"
 
-counts_df = counts_df.loc[common_cells]
-annot_df = annot_df.loc[common_cells]
 
-# Create AnnData with sparse count matrix
-adata_ref = AnnData(
-    X=sp.csr_matrix(counts_df.values),
-    obs=annot_df,
-)
-adata_ref.var_names = (
-    counts_df.columns.astype(
-        str
-    ).tolist()
-)
-adata_ref.obs_names = (
-    counts_df.index.astype(str).tolist()
-)
-
-print(
-    f"Reference AnnData: {adata_ref.shape}"
-)
-print(
-    f"  obs columns: {adata_ref.obs.columns.tolist()}"
-)
-
-# %%
-ct_col = "Condition"
-print(
-    f"Cell types ({adata_ref.obs[ct_col].nunique()}):"
-)
 print(
     adata_ref.obs[ct_col].value_counts()
 )
 
-# %%
-# Standardize: rename to 'cell_type' for RCTD-py and FlashDeconv compatibility
-adata_ref.obs["cell_type"] = (
-    adata_ref.obs[ct_col]
-    .astype(str)
-    .astype("category")
-)
-
-# Remove Unknown/Unassigned cells (FlashDeconv warns these absorb proportions)
-mask_unknown = (
-    adata_ref.obs["cell_type"]
-    .str.lower()
-    .isin(
-        [
-            "unknown",
-            "unassigned",
-            "nan",
-            "none",
-            "",
-        ]
-    )
-)
-if mask_unknown.any():
-    print(
-        f"Removing {mask_unknown.sum()} unknown/unassigned cells"
-    )
-    adata_ref = adata_ref[
-        ~mask_unknown
-    ].copy()
-
-# Basic QC: filter cells with very low counts
-sc.pp.calculate_qc_metrics(
-    adata_ref, inplace=True
-)
-min_counts = 100
-adata_ref = adata_ref[
-    adata_ref.obs["total_counts"]
-    >= min_counts
-].copy()
-print(
-    f"After QC (min {min_counts} UMI): {adata_ref.shape}"
-)
 
 # %%
-# Save the reference AnnData
-ref_path = "GSE200997/GSE200997_CRC_scRNA_reference.h5ad"
-adata_ref.write_h5ad(ref_path)
-print(f"Reference saved to: {ref_path}")
-print(f"  Shape: {adata_ref.shape}")
-print(
-    f"  Cell types: {adata_ref.obs['cell_type'].nunique()}"
+adata = sc.read_h5ad(
+    r"C:\Users\rafae\Projects\segmentation-and-annotation\data\processed\crc_tutorial_17032026_1255\Visium_HD_Human_Colon_Cancer_annotated.h5ad"
 )
-print(adata_ref)
 
-# %%
-import flashdeconv as fd
-
+# Subset genes from our segmented cell dataset adata object and our ref, adata_ref
 # Load the 008 um data
 adata_st_subset = sdata_sub.tables[
     "square_008um"
 ].copy()
+
+# Re-index reference by gene symbols (CellxGene uses Ensembl IDs as var_names)
+adata_ref.var_names = adata_ref.var[
+    "feature_name"
+].astype(str)
+adata_ref.var_names_make_unique()
+
+# Intersect on shared gene symbols across ALL three objects
+common_genes = (
+    adata.var_names.intersection(
+        adata_st_subset.var_names
+    ).intersection(adata_ref.var_names)
+)
+print(
+    f"Common genes: {len(common_genes)} "
+    f"(adata: {adata.n_vars}, "
+    f"spatial: {adata_st_subset.n_vars}, "
+    f"ref: {adata_ref.n_vars})"
+)
+
+adata = adata[:, common_genes].copy()
+adata_st_subset = adata_st_subset[
+    :, common_genes
+].copy()
+adata_ref = adata_ref[
+    :, common_genes
+].copy()
+
+# %%
+
 # Filter by UMI (same range as rctd-py: 100–20M)
 umi = adata_st_subset.X.sum(axis=1).A1
 
@@ -1510,6 +1403,7 @@ print(
     f"UMI filter: kept {umi_mask.sum()}/{len(umi_mask)} pixels"
 )
 # %%
+import flashdeconv as fd
 
 # Deconvolve -https://github.com/cafferychen777/flashdeconv
 fd.tl.deconvolve(
@@ -1531,6 +1425,41 @@ plt.savefig(
 )
 plt.close()
 # %%
+
+# Downsample to 60k cells, preserving cell type proportions
+n_target = 60_000
+if adata_ref.n_obs > n_target:
+    ct_counts = adata_ref.obs[
+        ct_col
+    ].value_counts()
+    ct_fracs = (
+        ct_counts / ct_counts.sum()
+    )
+    ct_n = (
+        (ct_fracs * n_target)
+        .round()
+        .astype(int)
+    )
+    # Ensure we don't exceed available cells per type
+    ct_n = ct_n.clip(upper=ct_counts)
+    idx = []
+    for ct, n in ct_n.items():
+        ct_idx = adata_ref.obs.index[
+            adata_ref.obs[ct_col] == ct
+        ]
+        idx.extend(
+            ct_idx.to_series()
+            .sample(
+                n=n, random_state=42
+            )
+            .tolist()
+        )
+    adata_ref_dw = adata_ref[idx].copy()
+    print(
+        f"Downsampled ref: {adata_ref_dw.n_obs} cells"
+    )
+
+# %%
 # https://github.com/p-gueguen/rctd-py
 # Disable torch.compile/inductor — requires MSVC (cl) which is not available on this system
 import torch._dynamo
@@ -1542,8 +1471,9 @@ torch._dynamo.disable()
 
 from rctd import Reference, run_rctd
 
+# Downsample the reference file to avoid memory errors:
 reference = Reference(
-    adata_ref,
+    adata_ref_dw,
     cell_type_col=ct_col,
 )
 
@@ -1576,7 +1506,6 @@ adata_st_filtered.obs[
     ]
 )
 
-# %%
 sc.pl.spatial(
     adata_st_filtered,
     color="rctd_dominant",
@@ -1584,7 +1513,7 @@ sc.pl.spatial(
     show=False,
 )
 plt.savefig(
-    "rctd_dominant.png",x
+    "rctd_dominant.png",
     dpi=2000,
     bbox_inches="tight",
 )
@@ -1592,25 +1521,9 @@ plt.close()
 
 # %%
 # Celltypist
-
 import celltypist
-adata = sc.read_h5ad(
-    r"C:\Users\rafae\Projects\segmentation-and-annotation\data\processed\crc_tutorial_17032026_1255\Visium_HD_Human_Colon_Cancer_annotated.h5ad"
-)
 
-# Subset genes from our segmented cell dataset adata object and our ref, adata_ref
-# Subset to shared genes
-common_genes = adata.var_names.intersection(adata_ref.var_names)
-adata = adata[:, common_genes].copy()
-adata_ref = adata_ref[:, common_genes].copy()
-
-
-# %%
-adata.X = (
-    adata.layers[
-        "counts"
-    ].copy()
-)
+adata.X = adata.layers["counts"].copy()
 sc.pp.normalize_total(
     adata,
     target_sum=1e4,
@@ -1621,59 +1534,61 @@ adata.layers[
     "lognorm_counts_celltypist"
 ] = adata.X.copy()
 
-# %%
 # Now do the same log-normalization for the adata_ref
 sc.pp.normalize_total(
-    adata_ref,
+    adata_ref_dw,
     target_sum=1e4,
 )
-sc.pp.log1p(adata_ref)
+sc.pp.log1p(adata_ref_dw)
 
-adata_ref.layers[
+adata_ref_dw.layers[
     "lognorm_counts_celltypist"
-] = adata_ref.X.copy()
+] = adata_ref_dw.X.copy()
 
 
-# %%
 model = celltypist.train(
-    adata_ref,
+    adata_ref_dw,
     labels=ct_col,
     n_jobs=1,
     feature_selection=True,
 )
 
-# %%
-model_path = ("celltypist_model.pkl")
+model_path = "celltypist_model.pkl"
 model.write(model_path)
 
 predictions = celltypist.annotate(
     adata,
     model=model,
     majority_voting=True,
-    over_clustering="novae_domains_8"
+    over_clustering="novae_domains_8",
 )
-preds_adata = (
-    predictions.to_adata()
-)
+preds_adata = predictions.to_adata()
 
-adata.obs[
-    f"cell_type_celltypist"
-] = preds_adata.obs[
-    "majority_voting"
-].values
+adata.obs[f"cell_type_celltypist"] = (
+    preds_adata.obs[
+        "majority_voting"
+    ].values
+)
 adata.obs[
     f"cell_type_celltypist_per_cell"
 ] = preds_adata.obs[
     "predicted_labels"
 ].values
-adata.obs[
-    f"conf_score_celltypist"
-] = preds_adata.obs[
-    "conf_score"
-].values
+adata.obs[f"conf_score_celltypist"] = (
+    preds_adata.obs["conf_score"].values
+)
 
 sc.pl.spatial(
     adata,
     color="cell_type_celltypist",
-    spot_size=9,
+    spot_size=33,
+    show=False,
 )
+plt.savefig(
+    "cell_type_celltypist.png",
+    dpi=2000,
+    bbox_inches="tight",
+)
+plt.close()
+
+# %%

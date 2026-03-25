@@ -15,3 +15,4 @@ scripts/GSE200997/GSE200997_GEO_processed_CRC_10X_cell_annotation.csv.gz
 scripts/GSE200997/GSE200997_GEO_processed_CRC_10X_raw_UMI_count_matrix.csv.gz
 scripts/GSE200997_series_matrix.txt.gz
 .claude/settings.local.json
+scripts/pelka_crc_all_cells.h5ad
