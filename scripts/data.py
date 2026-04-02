@@ -1485,7 +1485,7 @@ result = run_rctd(
 )
 
 # %%
-
+# NOTE: the following chunk of code will be different from the tutorial. See this link for more details: https://github.com/p-gueguen/rctd-py/issues/9
 # Store per-cell-type weights directly (results align 1:1 with adata_st_filtered)
 for i, ct in enumerate(
     result.cell_type_names
