@@ -114,7 +114,7 @@ numba==0.64.0
 numcodecs==0.16.5
 numpy==2.4.3
 ome-types==0.6.3
-ome-zarr==0.14.0
+ome-zarr==0.14.0 # might have to downgrade to 0.13.0 to save the sdata objects. Thanks to @vtriantafyl for pointing this out!
 omnipath==1.0.12
 openpyxl==3.1.5
 opt_einsum==3.4.0
