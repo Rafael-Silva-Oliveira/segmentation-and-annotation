@@ -981,8 +981,6 @@ adata = sc.read_h5ad(
     r"C:\Users\rafae\Projects\segmentation-and-annotation\data\spatial\processed\crc_tutorial_17032026_1255\Visium_HD_Human_Colon_Cancer_annotated.h5ad"
 )
 
-# %%
-
 
 # Helper: map point coordinates from adata.obsm['spatial'] into an image
 # coordinate system, create a PointsModel, attach it to `sdata_sub`, and
