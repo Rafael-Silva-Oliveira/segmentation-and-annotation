@@ -958,9 +958,7 @@ plt.savefig(
 plt.close()
 
 # %%
-# =============================================================================
-# SAVE FINAL RESULTS
-# =============================================================================
+# Save final results
 logger.info(
     "Saving final annotated AnnData..."
 )
