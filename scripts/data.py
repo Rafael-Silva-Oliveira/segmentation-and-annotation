@@ -997,7 +997,6 @@ def map_and_plot_points(
     """Map local adata spatial coords into the sample image coordinate
     system, create a PointsModel and attach to sdata_sub, and plot.
 
-    Returns a dict with diagnostics and the mapped DataFrame.
     """
     import numpy as _np
     import pandas as _pd
