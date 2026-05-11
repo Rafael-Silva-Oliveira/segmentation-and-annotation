@@ -1,5 +1,4 @@
 # %%
-# Visium HD CRC Tutorial - End-to-end pipeline
 # 10x Genomics Human Colorectal Cancer (FFPE)
 # Steps: Segmentation (01) -> Clustering (02) -> Annotation (03)
 import warnings
