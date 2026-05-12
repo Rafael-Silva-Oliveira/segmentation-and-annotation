@@ -1316,10 +1316,8 @@ map_and_plot_points(
 )
 
 # %%
-# =============================================================================
 # ADDITIONAL STEP: Annotation using reference scRNA dataset with RCTD-py and FlashDeconv
 # Reference: GSE200997 - Human CRC scRNA-seq (Lee et al.)
-# =============================================================================
 import urllib.request, os
 
 ref_url = "https://datasets.cellxgene.cziscience.com/0ca03016-58ec-4d4e-86d9-22dda860bc8c.h5ad"
