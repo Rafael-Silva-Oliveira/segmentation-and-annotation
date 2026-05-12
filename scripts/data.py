@@ -1602,5 +1602,3 @@ plt.savefig(
     bbox_inches="tight",
 )
 plt.close()
-
-# %%
