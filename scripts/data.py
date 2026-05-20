@@ -1598,7 +1598,7 @@ sc.pl.spatial(
 )
 plt.savefig(
     "cell_type_celltypist.png",
-    dpi=2000,
+    dpi=2500,
     bbox_inches="tight",
 )
 plt.close()
